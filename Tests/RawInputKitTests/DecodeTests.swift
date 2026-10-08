@@ -42,6 +42,12 @@ struct SampleTests {
             : CGSize(width: raw.info.width, height: raw.info.height)
         #expect(raw.image.extent.size == expected)
 
+        // The fallback checks its own colours against the camera's preview. None of the
+        // samples should trip it; a regression in levels or white balance would.
+        let distance = try #require(raw.previewDistance, "every sample has an embedded preview")
+        #expect(distance < RawImage.suspectPreviewDistance)
+        #expect(!raw.isColorSuspect)
+
         let color = centreColor(raw.image)
         #expect(color.min() >= 0)
         #expect(color.max() > 0.001, "the image is black")
@@ -156,6 +162,25 @@ struct AgreementTests {
             let display = try open(url, routing).displayImage(exposureEV: 6)
             #expect(centreColor(display).max() <= 1.001)
         }
+    }
+
+    /// The point of the shared rendering step: scene-linear data from either decoder,
+    /// taken through the same look, should be the same picture. Their own outputs are not.
+    @Test func sharedRenderingBringsTheRoutesTogether() throws {
+        var options = RawDecodeOptions()
+        options.routing = .apple
+        let appleOwn = try RawInput.open(url, options: options)
+        options.appleRendering = .linear
+        let appleLinear = try RawInput.open(url, options: options)
+        let fallback = try open(url, .fallback)
+        #expect(!appleOwn.isSceneLinear && appleLinear.isSceneLinear && fallback.isSceneLinear)
+        #expect(appleLinear.suggestedExposureEV > 0, "Apple's linear output is measured, like the fallback's")
+
+        let own = simd_distance(centreColor(appleOwn.displayImage()), centreColor(fallback.displayImage()))
+        let shared = simd_distance(
+            centreColor(appleLinear.rendered(look: .film)), centreColor(fallback.rendered(look: .film)))
+        #expect(shared < own, "closer after the shared step than before it")
+        #expect(shared < 0.03)
     }
 
     /// The in-camera crop lives in metadata; the sensor data is the full 3:2 frame. A

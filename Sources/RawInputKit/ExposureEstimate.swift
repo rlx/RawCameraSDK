@@ -1,3 +1,4 @@
+import CoreImage
 import Foundation
 
 /// Picks a default brightness for a scene-linear image.
@@ -40,5 +41,38 @@ struct ExposureEstimate {
         let bright = percentile(0.99)
         guard bright > 0 else { return 0 }
         return Double(log2(min(max(0.9 / bright, 1), 16)))
+    }
+
+    /// The suggested exposure for a linear image, measured from a small render of it.
+    ///
+    /// Both decoders' output goes through this one function, and that is the point. The
+    /// shared rendering step can only make two decoders' pictures match if their default
+    /// brightness is decided the same way, from the same kind of evidence. Measuring each
+    /// decoder's data with its own method (sensor samples for one, rendered pixels for the
+    /// other) left the two about a third further apart in tests over 51 files.
+    ///
+    /// The image is reduced to at most 384 pixels on its long edge first. That is plenty for
+    /// a percentile, costs a few milliseconds, and averages away single hot pixels that
+    /// would otherwise set the white point.
+    static func measure(_ image: CIImage) -> Double {
+        let extent = image.extent
+        guard !extent.isEmpty, !extent.isInfinite else { return 0 }
+        let scale = min(1, 384 / max(extent.width, extent.height))
+        let small = image
+            .transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
+            .applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: scale, kCIInputAspectRatioKey: 1])
+        let width = max(1, Int(extent.width * scale)), height = max(1, Int(extent.height * scale))
+        var pixels = [Float](repeating: 0, count: width * height * 4)
+        RenderContext.shared.render(
+            small, toBitmap: &pixels, rowBytes: width * 4 * MemoryLayout<Float>.stride,
+            bounds: CGRect(x: 0, y: 0, width: width, height: height), format: .RGBAf,
+            colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
+
+        var estimate = ExposureEstimate()
+        for pixel in stride(from: 0, to: pixels.count, by: 4) {
+            // The brightest channel, so that a saturated colour counts as bright.
+            estimate.add(max(pixels[pixel], pixels[pixel + 1], pixels[pixel + 2]))
+        }
+        return estimate.suggestedEV
     }
 }

@@ -1,3 +1,4 @@
+import CoreImage
 import Foundation
 import ImageIO
 import Testing
@@ -41,6 +42,56 @@ struct ExposureEstimateTests {
         #expect(estimate.percentile(0.99) == 0)
         estimate.add(0.45)
         #expect(abs(estimate.suggestedEV - 1) < 0.02)
+    }
+}
+
+@Suite("Preview agreement")
+struct PreviewAgreementTests {
+    /// A flat mid-grey card with a coloured patch, as a stand-in for a photograph.
+    private func picture(tint: CIColor? = nil) -> CIImage {
+        let frame = CGRect(x: 0, y: 0, width: 240, height: 160)
+        let grey = CIImage(color: CIColor(red: 0.4, green: 0.4, blue: 0.4)).cropped(to: frame)
+        let patch = CIImage(color: CIColor(red: 0.7, green: 0.3, blue: 0.2))
+            .cropped(to: CGRect(x: 60, y: 40, width: 80, height: 60))
+        let composed = patch.composited(over: grey)
+        guard let tint else { return composed }
+        return composed.applyingFilter("CIMultiplyCompositing", parameters: [
+            kCIInputBackgroundImageKey: CIImage(color: tint).cropped(to: frame),
+        ])
+    }
+
+    private func distance(_ image: CIImage, from reference: CIImage) throws -> Double {
+        let preview = try #require(testContext.createCGImage(reference, from: reference.extent))
+        return try #require(PreviewAgreement.distance(image, preview: preview, context: testContext))
+    }
+
+    @Test func identicalPicturesAgree() throws {
+        #expect(try distance(picture(), from: picture()) < 0.01)
+    }
+
+    /// The camera's preview has its own brightness and contrast; only hue is evidence.
+    @Test func brightnessAloneIsNotDisagreement() throws {
+        // About two thirds of a stop darker. (Near black the measure deliberately loses
+        // interest, since hue there is mostly noise, so the test stays out of the shadows.)
+        let darker = picture(tint: CIColor(red: 0.8, green: 0.8, blue: 0.8))
+        #expect(try distance(darker, from: picture()) < 0.03)
+    }
+
+    /// What a wrong black level or white balance looks like: a cast over the whole frame.
+    @Test func colorCastIsFlagged() throws {
+        let pink = picture(tint: CIColor(red: 1, green: 0.55, blue: 0.8))
+        #expect(try distance(pink, from: picture()) > RawImage.suspectPreviewDistance)
+    }
+
+    @Test func upsideDownPictureIsFlagged() throws {
+        // Top half bright red, bottom half blue: unmistakable once flipped.
+        let frame = CGRect(x: 0, y: 0, width: 240, height: 160)
+        let red = CIImage(color: CIColor(red: 0.8, green: 0.1, blue: 0.1)).cropped(to: frame)
+        let blue = CIImage(color: CIColor(red: 0.1, green: 0.1, blue: 0.8))
+            .cropped(to: CGRect(x: 0, y: 0, width: 240, height: 80))
+        let upright = blue.composited(over: red)
+        let flipped = upright.oriented(.down).transformed(by: CGAffineTransform(translationX: 240, y: 160))
+        #expect(try distance(flipped, from: upright) > RawImage.suspectPreviewDistance)
     }
 }
 

@@ -14,7 +14,9 @@ enum RawPreview {
         // LibRaw first: it picks the largest of a file's several previews and understands
         // formats ImageIO does not. ImageIO is the backstop, and can also develop a preview
         // from the sensor data for the few files that embed none.
-        if let image = try? embedded(url, maxPixelSize: maxPixelSize) { return image }
+        if let file = try? LibRawFile(url), let image = try? embedded(in: file, maxPixelSize: maxPixelSize) {
+            return image
+        }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateThumbnailAtIndex(
                 source, 0, thumbnailOptions(maxPixelSize, alwaysFromImage: false) as CFDictionary)
@@ -22,8 +24,9 @@ enum RawPreview {
         return image
     }
 
-    private static func embedded(_ url: URL, maxPixelSize: Int) throws -> CGImage {
-        let file = try LibRawFile(url)
+    /// The preview from a file LibRaw already has open, which saves parsing it twice when
+    /// the caller is in the middle of decoding it.
+    static func embedded(in file: LibRawFile, maxPixelSize: Int) throws -> CGImage {
         let orientation = RawInfo(file.info).orientation
         return try file.withThumbnail { thumbnail in
             // Copied, because the image may be decoded lazily after LibRaw's buffer is gone.

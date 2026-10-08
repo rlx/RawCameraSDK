@@ -34,6 +34,12 @@ public struct RawImage: Sendable {
 
     public let route: RawRoute
 
+    /// True when `image` is scene-linear: proportional to the light the sensor recorded,
+    /// with no tone curve applied. Always true on the fallback route; true on the Apple
+    /// route only when it was opened with `appleRendering = .linear`. `rendered(look:)`
+    /// gives matching pictures from both routes only for scene-linear images.
+    public let isSceneLinear: Bool
+
     /// The decoder in words, for display and logs: "Apple RAW 8", "LibRaw 0.22.2 + Metal",
     /// "LibRaw 0.22.2 CPU".
     public let decoder: String
@@ -41,9 +47,27 @@ public struct RawImage: Sendable {
     public let info: RawInfo
 
     /// Exposure, in stops, that brings a scene-linear image to a viewable brightness: the
-    /// boost that puts the brightest 1% of the frame just under white. Zero on the Apple
-    /// route, where the image is already rendered for display.
+    /// boost that puts the brightest 1% of the frame just under white. It is measured the
+    /// same way on both routes, which is what lets one rendering step serve both. Zero when
+    /// the image is not scene-linear, since Apple has then already rendered it for display.
     public let suggestedExposureEV: Double
+
+    /// How far the image's colours sit from the camera's embedded preview, ignoring
+    /// brightness: 0 is identical, below 0.05 is typical of a correct decode. `nil` when it
+    /// was not measured: on the Apple route, when the file has no preview, or when
+    /// `RawDecodeOptions.checksColorAgainstPreview` is off.
+    public let previewDistance: Double?
+
+    /// The distance above which a decode deserves a second look.
+    public static let suspectPreviewDistance = 0.15
+
+    /// True when the fallback's colours disagree with the camera's own rendering by enough
+    /// that the decode is probably wrong: usually a camera LibRaw does not properly know.
+    /// The image is still returned, because a tinted picture can be better than none and
+    /// only the caller knows which; a viewer should mark it, an importer might refuse it.
+    public var isColorSuspect: Bool {
+        previewDistance.map { $0 > Self.suspectPreviewDistance } ?? false
+    }
 
     /// True when the fallback developed the frame at half its width and height; see
     /// `RawDecodeOptions.halfSizeAbovePixels`.
@@ -56,11 +80,13 @@ public struct RawImage: Sendable {
     public let openSeconds: Double
 
     public init(
-        image: CIImage, route: RawRoute, decoder: String, info: RawInfo, suggestedExposureEV: Double,
-        isHalfSize: Bool, openSeconds: Double
+        image: CIImage, route: RawRoute, isSceneLinear: Bool, decoder: String, info: RawInfo,
+        suggestedExposureEV: Double, previewDistance: Double? = nil, isHalfSize: Bool, openSeconds: Double
     ) {
+        self.previewDistance = previewDistance
         self.image = image
         self.route = route
+        self.isSceneLinear = isSceneLinear
         self.decoder = decoder
         self.info = info
         self.suggestedExposureEV = suggestedExposureEV
@@ -71,8 +97,8 @@ public struct RawImage: Sendable {
     /// `image` made ready to show: `suggestedExposureEV` plus `exposureEV` applied in linear
     /// light, then clipped to the displayable range.
     ///
-    /// This is a convenience for viewers and tests, not a rendering pipeline. An editor
-    /// should take `image` and apply its own exposure, tone curve and gamut handling.
+    /// No tone curve is applied, so a scene-linear image comes out flat. It shows what the
+    /// decoder produced; `rendered(look:)` shows a picture.
     public func displayImage(exposureEV: Double = 0) -> CIImage {
         var result = image
         let stops = suggestedExposureEV + exposureEV

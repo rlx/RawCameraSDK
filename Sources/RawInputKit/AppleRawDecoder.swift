@@ -7,16 +7,15 @@ import Foundation
 /// correction, noise reduction and tone mapping for the cameras it supports, and it gains
 /// new cameras with OS updates. The work in this file is knowing when it will *not* work.
 enum AppleRawDecoder {
-    static func decode(_ url: URL, options: RawDecodeOptions) throws -> (image: CIImage, decoder: String) {
+    static func decode(
+        _ url: URL, options: RawDecodeOptions
+    ) throws -> (image: CIImage, decoder: String, exposureEV: Double) {
         guard let filter = CIRAWFilter(imageURL: url) else { throw RawError.appleCannotDecode }
 
         if options.appleDecoderVersion == .newest, let newest = newestVersion(of: filter) {
             filter.decoderVersion = newest
         }
-        if options.appleRendering == .linear {
-            filter.boostAmount = 0
-            filter.isGamutMappingEnabled = false
-        }
+        configure(filter, for: options.appleRendering)
         // Keep highlights above reference white instead of clipping them; the caller decides
         // what to do with the headroom.
         filter.extendedDynamicRangeAmount = 1
@@ -24,7 +23,34 @@ enum AppleRawDecoder {
         guard let image = filter.outputImage, !image.extent.isEmpty, !image.extent.isInfinite else {
             throw RawError.appleCannotDecode
         }
-        return (image, "Apple RAW \(filter.decoderVersion.rawValue)")
+        let exposureEV = options.appleRendering == .linear ? linearExposure(url, version: filter.decoderVersion) : 0
+        return (image, "Apple RAW \(filter.decoderVersion.rawValue)", exposureEV)
+    }
+
+    private static func configure(_ filter: CIRAWFilter, for rendering: RawDecodeOptions.AppleRendering) {
+        guard rendering == .linear else { return }
+        // "Boost" is Apple's name for its tone curve; at zero the output is proportional to
+        // the scene. Gamut mapping would bend saturated colours toward the display gamut,
+        // which is a rendering decision and belongs to whoever renders.
+        filter.boostAmount = 0
+        filter.isGamutMappingEnabled = false
+    }
+
+    /// Default brightness for Apple's linear output, measured from the pixels by the same
+    /// function that measures the fallback's (see `ExposureEstimate.measure`).
+    ///
+    /// Each decoder has its own idea of where sensor white sits, so a calibration constant
+    /// from one says nothing about the other; only the picture says how bright it came out.
+    /// Measuring costs a reduced-size decode, paid only by callers who ask for linear output.
+    private static func linearExposure(_ url: URL, version: CIRAWDecoderVersion) -> Double {
+        guard let filter = CIRAWFilter(imageURL: url) else { return 0 }
+        filter.decoderVersion = version
+        configure(filter, for: .linear)
+        filter.extendedDynamicRangeAmount = 1
+        let longEdge = max(filter.nativeSize.width, filter.nativeSize.height)
+        guard longEdge > 0 else { return 0 }
+        filter.scaleFactor = Float(min(1, 512 / longEdge))
+        return filter.outputImage.map(ExposureEstimate.measure) ?? 0
     }
 
     /// Whether Apple's engine really develops the file.

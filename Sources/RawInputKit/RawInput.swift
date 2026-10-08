@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import Foundation
 import RawShim
 
@@ -51,14 +52,16 @@ public enum RawInput {
             // (JPEG XL DNG, for one), and a decodable image is worth more than its EXIF.
             let info = (try? info(url)) ?? RawInfo(size: apple.image.extent.size)
             return RawImage(
-                image: apple.image, route: .apple, decoder: apple.decoder, info: info,
-                suggestedExposureEV: 0, isHalfSize: false, openSeconds: elapsed())
+                image: apple.image, route: .apple, isSceneLinear: options.appleRendering == .linear,
+                decoder: apple.decoder, info: info, suggestedExposureEV: apple.exposureEV,
+                isHalfSize: false, openSeconds: elapsed())
         }
 
         let fallback = try FallbackRawDecoder.decode(url, options: options)
         return RawImage(
-            image: fallback.image, route: .fallback, decoder: fallback.decoder, info: fallback.info,
-            suggestedExposureEV: fallback.exposureEV, isHalfSize: fallback.isHalfSize, openSeconds: elapsed())
+            image: fallback.image, route: .fallback, isSceneLinear: true, decoder: fallback.decoder,
+            info: fallback.info, suggestedExposureEV: fallback.exposureEV,
+            previewDistance: fallback.previewDistance, isHalfSize: fallback.isHalfSize, openSeconds: elapsed())
     }
 
     /// Camera and exposure metadata. Reads the file's header only; no sensor data is decoded.
@@ -92,6 +95,20 @@ public enum RawInput {
     /// of each camera and mode and reuses the answer for the rest.
     public static func appleCanDecode(_ url: URL) -> Bool {
         AppleRawDecoder.canDecode(url)
+    }
+
+    /// How far an image's colours sit from the embedded preview of the file it came from;
+    /// see `RawImage.previewDistance`. The fallback measures this itself. This entry point
+    /// is for measuring any other rendering of the file, Apple's included, and forces that
+    /// image to be rendered at a small size.
+    public static func previewDistance(of image: CIImage, forFileAt url: URL) -> Double? {
+        // Only a preview the camera itself embedded counts as a reference. ImageIO can
+        // synthesise one by developing the file, but that would be comparing Apple's
+        // decoder with itself.
+        guard let file = try? LibRawFile(url),
+              let preview = try? RawPreview.embedded(in: file, maxPixelSize: 512)
+        else { return nil }
+        return PreviewAgreement.distance(image, preview: preview)
     }
 
     /// The fallback decoder's version, e.g. "LibRaw 0.22.2".

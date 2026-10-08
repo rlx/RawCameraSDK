@@ -21,8 +21,8 @@ enum Probe {
         var fallbackDecoder = ""
         var fallbackError = ""
         var fallbackSeconds = 0.0
-        /// Colour distance from the embedded preview; see `PreviewDistance`. Nil when the
-        /// file has no preview or the route failed.
+        /// Colour distance from the embedded preview; see `RawImage.previewDistance`. Nil
+        /// when the file has no preview or the route failed.
         var applePreviewDistance: Double?
         var fallbackPreviewDistance: Double?
     }
@@ -39,13 +39,12 @@ enum Probe {
             row.routine = info.decoderRoutine ?? "?"
         }
         row.apple = RawInput.appleCanDecode(url)
-        let preview = try? RawInput.preview(url, maxPixelSize: 512)
 
         var options = RawDecodeOptions()
-        if row.apple, let preview {
+        if row.apple {
             options.routing = .apple
             row.applePreviewDistance = (try? RawInput.open(url, options: options)).flatMap {
-                PreviewDistance.measure($0.displayImage(), preview: preview, context: context)
+                RawInput.previewDistance(of: $0.displayImage(), forFileAt: url)
             }
         }
 
@@ -59,10 +58,7 @@ enum Probe {
             row.fallback = FullRender.run(raw.image.cropped(to: crop), context: context)
             row.fallbackDecoder = raw.decoder
             row.fallbackSeconds = raw.openSeconds
-            if let preview {
-                row.fallbackPreviewDistance = PreviewDistance.measure(
-                    raw.displayImage(), preview: preview, context: context)
-            }
+            row.fallbackPreviewDistance = raw.previewDistance
         } catch {
             row.fallbackError = error.localizedDescription
         }

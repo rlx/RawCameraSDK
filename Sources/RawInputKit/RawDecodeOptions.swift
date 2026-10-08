@@ -45,5 +45,14 @@ public struct RawDecodeOptions: Sendable {
     /// ignores it: `CIRAWFilter` renders lazily, in tiles, and manages its own memory.
     public var halfSizeAbovePixels: Int = 64_000_000
 
+    /// Fallback route only: compare the developed image with the camera's embedded preview
+    /// and report the result in `RawImage.previewDistance`.
+    ///
+    /// The fallback can decode a file without error and still get its colours wrong, most
+    /// often for a camera newer than LibRaw's tables. This is how a caller finds out. It
+    /// costs one small JPEG decode and two tiny renders, a few tens of milliseconds; turn
+    /// it off for bulk work where nobody will act on the answer.
+    public var checksColorAgainstPreview = true
+
     public init() {}
 }
