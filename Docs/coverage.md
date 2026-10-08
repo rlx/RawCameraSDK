@@ -9,9 +9,9 @@ Measured with `rawprobe` on macOS 27.0.1 (arm64), over 944 CC0 files from raw.pi
 | Only Apple opens it | 14 |
 | Neither opens it | 16 |
 
-Fallback decode time, median: 0.18 s on the Metal path (784 files), 1.29 s on the CPU path (130 files).
+Fallback decode time, median: 0.21 s on the Metal path (784 files), 1.41 s on the CPU path (130 files).
 
-"Opens" means pixels came out. It does not mean the colour is right, so each fallback result is also compared with the camera's embedded preview: 22 of 885 files with a preview differ enough to be suspect (listed at the end).
+"Opens" means pixels came out. It does not mean the colour is right, so each fallback result is also compared with the camera's embedded preview: 15 of 822 files with a preview differ enough to be suspect (listed at the end).
 
 ## Only the fallback opens it
 
@@ -82,25 +82,18 @@ Fallback decode time, median: 0.18 s on the Metal path (784 files), 1.29 s on th
 
 ## Fallback opens it but the colour is suspect
 
-- Panasonic DMC-FZ50 (16:9), RAW: distance 0.31
 - Ricoh GXR S10 (12bit (4:3)), DNG: distance 0.30
 - Canon EOS R6 Mark III (RAW (3:2)), CR3: distance 0.27
 - Canon EOS R6 Mark III (CRAW (3:2)), CR3: distance 0.27
 - Minolta DiMAGE 5 (4:3), MRW: distance 0.26 (Apple cannot open it either)
 - LG-F800K (10bit (4:3)), DNG: distance 0.24
-- Canon EOS D30 (RAW (3:2)), CRW: distance 0.23
 - Kodak EOSDCS3C (8bit (4:3)), TIF: distance 0.23
+- Canon EOS D30 (RAW (3:2)), CRW: distance 0.22
 - Sinarback eVolution 75, Sinar p3 / f3 (16bit (4:3)), STI: distance 0.21 (Apple cannot open it either)
-- Realme RMX1851 (16bit (4:3)), DNG: distance 0.20
 - Panasonic DC-GF10 (16:9), RW2: distance 0.19
-- LG-H910 (16bit (4:3)), DNG: distance 0.19
-- Blackmagic URSA 4K (12bit (16:9)), DNG: distance 0.18
 - Panasonic DMC-LX10 (1:1), RW2: distance 0.17
 - YIAC 3 (16bit (4:3)), DNG: distance 0.17
 - Leica X2 (12bit (3:2)), DNG: distance 0.17
-- Sigma fp (12bit (16:9)), DNG: distance 0.16
 - Canon PowerShot SX130 IS (12bit 12bit CHDK ver. 1.5.1 (4:3)), DNG: distance 0.16
 - Samsung GX20 (12bit (3:2)), DNG: distance 0.16
-- Canon EOS 1000D (RAW (3:2)), CR2: distance 0.16
-- Canon PowerShot A3300 IS (12bit 12bit CHDK ver. 1.4.1 (4:3)), DNG: distance 0.16
-- Sony DSC-RX1R (14bit 14bit compressed (3:2)), ARW: distance 0.15
+- Canon PowerShot A3300 IS (12bit 12bit CHDK ver. 1.4.1 (4:3)), DNG: distance 0.15

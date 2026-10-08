@@ -5,3 +5,4 @@ Tests/Corpus/
 xcuserdata/
 Examples/RawInputDemo/Samples/files/
 .swiftpm/
+fuzz-findings/

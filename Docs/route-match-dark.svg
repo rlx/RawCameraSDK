@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 202" width="760" height="202" role="img" aria-label="Colour difference between the two decoders' pictures, before and after shared rendering" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13">
+<line x1="232.0" y1="26.0" x2="232.0" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="232.0" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">0</text>
+<line x1="301.7" y1="26.0" x2="301.7" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="301.7" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">5</text>
+<line x1="371.4" y1="26.0" x2="371.4" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="371.4" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">10</text>
+<line x1="441.1" y1="26.0" x2="441.1" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="441.1" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">15</text>
+<line x1="510.9" y1="26.0" x2="510.9" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="510.9" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">20</text>
+<line x1="580.6" y1="26.0" x2="580.6" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="580.6" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">25</text>
+<line x1="650.3" y1="26.0" x2="650.3" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="650.3" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">30</text>
+<line x1="720.0" y1="26.0" x2="720.0" y2="158.0" stroke="#33332f" stroke-width="1"/>
+<text x="720.0" y="176.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">35</text>
+<text x="476.0" y="194.0" text-anchor="middle" fill="#c3c2b7" font-weight="400" font-size="12">colour difference between the two decoders, ΔE (lower = more alike)</text>
+<text x="220.0" y="52.5" text-anchor="end" fill="#ffffff" font-weight="400" font-size="13">Each decoder's own output</text>
+<path d="M293.4,46.0 h298.4 a0,0 0 0 1 0,0 v4.0 a0,0 0 0 1 -0,0 h-298.4 z" fill="#6b6a64" fill-opacity="0.35"/>
+<path d="M332.1,40.0 h94.8 a0,0 0 0 1 0,0 v16.0 a0,0 0 0 1 -0,0 h-94.8 z" fill="#6b6a64" fill-opacity="0.6"/>
+<circle cx="381.9" cy="48.0" r="5" fill="#6b6a64" stroke="#0d1117" stroke-width="2"/>
+<text x="599.8" y="52.5" text-anchor="start" fill="#c3c2b7" font-weight="400" font-size="12">median 10.7</text>
+<text x="220.0" y="96.5" text-anchor="end" fill="#ffffff" font-weight="400" font-size="13">Shared rendering, neutral look</text>
+<path d="M244.8,90.0 h150.2 a0,0 0 0 1 0,0 v4.0 a0,0 0 0 1 -0,0 h-150.2 z" fill="#199e70" fill-opacity="0.35"/>
+<path d="M257.1,84.0 h52.5 a0,0 0 0 1 0,0 v16.0 a0,0 0 0 1 -0,0 h-52.5 z" fill="#199e70" fill-opacity="0.6"/>
+<circle cx="277.1" cy="92.0" r="5" fill="#199e70" stroke="#0d1117" stroke-width="2"/>
+<text x="403.0" y="96.5" text-anchor="start" fill="#c3c2b7" font-weight="400" font-size="12">median 3.2</text>
+<text x="220.0" y="140.5" text-anchor="end" fill="#ffffff" font-weight="400" font-size="13">Shared rendering, film look</text>
+<path d="M243.8,134.0 h148.6 a0,0 0 0 1 0,0 v4.0 a0,0 0 0 1 -0,0 h-148.6 z" fill="#199e70" fill-opacity="0.35"/>
+<path d="M254.8,128.0 h50.0 a0,0 0 0 1 0,0 v16.0 a0,0 0 0 1 -0,0 h-50.0 z" fill="#199e70" fill-opacity="0.6"/>
+<circle cx="272.7" cy="136.0" r="5" fill="#199e70" stroke="#0d1117" stroke-width="2"/>
+<text x="400.4" y="140.5" text-anchor="start" fill="#c3c2b7" font-weight="400" font-size="12">median 2.9</text>
+</svg>
