@@ -12,6 +12,7 @@ import RawShim
 /// Not thread-safe: use an instance from one thread. Separate instances are independent.
 final class LibRawFile {
     private let handle: OpaquePointer
+    private var cancellation: Cancellation?
 
     /// Parses the container and metadata. Cheap; no sensor data is read.
     init(_ url: URL) throws {
@@ -31,11 +32,32 @@ final class LibRawFile {
         return info
     }
 
+    /// Refuses files whose sensor data would need more than this to decode. Call before `unpack`.
+    func setMemoryLimit(megabytes: Int) {
+        rik_set_memory_limit(handle, UInt32(clamping: megabytes))
+    }
+
+    /// Has the decoder poll `isCancelled` between stages of `unpack` and `withDeveloped`.
+    func setCancellation(_ isCancelled: @escaping @Sendable () -> Bool) {
+        let box = Cancellation(isCancelled)
+        cancellation = box  // owned here, so the pointer below stays valid until deinit
+        rik_set_cancel_callback(handle, { context in
+            Unmanaged<Cancellation>.fromOpaque(context!).takeUnretainedValue().isCancelled() ? 1 : 0
+        }, Unmanaged.passUnretained(box).toOpaque())
+    }
+
     /// Decompresses the sensor data: the expensive step, from tens of milliseconds to
     /// several seconds depending on the format.
     func unpack() throws {
         let code = rik_unpack(handle)
         guard code == 0 else { throw Self.error(code) }
+    }
+
+    /// What the GPU kernel needs to develop the mosaic, or `nil` if the file is not a plain
+    /// Bayer mosaic. Computed by the core, so every binding develops with the same numbers.
+    var developParameters: rik_develop_params? {
+        var parameters = rik_develop_params()
+        return rik_get_develop_params(handle, &parameters) == 0 ? parameters : nil
     }
 
     /// The raw Bayer plane, or `nil` if the file is not one the GPU kernel can develop.
@@ -70,6 +92,16 @@ final class LibRawFile {
     }
 
     private static func error(_ code: Int32) -> RawError {
-        .libRaw(code: code, message: String(cString: rik_strerror(code)))
+        switch code {
+        case RIK_CANCELLED: .cancelled
+        case RIK_TOO_BIG: .exceedsMemoryLimit
+        default: .fallbackCannotDecode(code: code, reason: String(cString: rik_strerror(code)))
+        }
     }
+}
+
+/// Carries the caller's cancellation closure across the C boundary as a context pointer.
+private final class Cancellation {
+    let isCancelled: @Sendable () -> Bool
+    init(_ isCancelled: @escaping @Sendable () -> Bool) { self.isCancelled = isCancelled }
 }

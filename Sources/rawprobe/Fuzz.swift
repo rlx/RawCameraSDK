@@ -1,6 +1,6 @@
 import CoreImage
 import Foundation
-import RawInputKit
+@_spi(Measurement) import RawInputKit
 
 /// `rawprobe fuzz`: feeds the fallback damaged copies of real files and records what
 /// happens to the process.
@@ -11,7 +11,7 @@ import RawInputKit
 /// so a crash or a hang is an observation, with the exact bytes kept for replay, instead of
 /// the end of the run.
 ///
-/// The damage is deliberately simple: a handful of bytes overwritten, mostly in the first
+/// The damage is simple: a handful of bytes overwritten, mostly in the first
 /// 64 KB where the metadata lives, sometimes a truncation. It is seeded, so a run can be
 /// repeated. This finds shallow bugs quickly; it is not a substitute for coverage-guided
 /// fuzzing of LibRaw itself, which its maintainers do upstream.
@@ -23,7 +23,7 @@ enum Fuzz {
         var options = RawDecodeOptions()
         options.routing = .fallback
         if let raw = try? RawInput.open(url, options: options) {
-            _ = FullRender.run(raw.rendered(look: .film), context: CIContext())
+            _ = RawMeasurement.renderFully(raw.rendered(look: .film), context: CIContext())
         }
     }
 

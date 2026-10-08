@@ -18,22 +18,30 @@ struct KernelTests {
 
         let width: Int, height: Int
         let pattern: SIMD4<UInt32>
+        /// Black level at each of the four mosaic positions. Real sensors differ per site.
+        let blackLevels: SIMD4<Float>
         var samples: [UInt16]
         var rawWidth: Int { width + 5 }
         var rawHeight: Int { height + 3 }
 
         /// `color(x, y)` is the scene colour at a picture coordinate, in 0...1 per channel;
         /// each sensor site records only its own channel of it.
-        init(width: Int = 8, height: Int = 8, pattern: SIMD4<UInt32>, color: (Int, Int) -> SIMD3<Float>) {
+        init(
+            width: Int = 8, height: Int = 8, pattern: SIMD4<UInt32>,
+            blackLevels: SIMD4<Float> = SIMD4(repeating: Mosaic.black), color: (Int, Int) -> SIMD3<Float>
+        ) {
             self.width = width
             self.height = height
             self.pattern = pattern
+            self.blackLevels = blackLevels
             samples = []
             samples = [UInt16](repeating: .max, count: rawWidth * rawHeight)
             for y in 0..<height {
                 for x in 0..<width {
-                    let channel = Int(pattern[(y & 1) * 2 + (x & 1)])
-                    let level = Self.black + color(x, y)[channel] * (Self.white - Self.black)
+                    let position = (y & 1) * 2 + (x & 1)
+                    let channel = Int(pattern[position])
+                    let black = blackLevels[position]
+                    let level = black + color(x, y)[channel] * (Self.white - black)
                     samples[(y + Int(Self.origin.y)) * rawWidth + x + Int(Self.origin.x)] = UInt16(level)
                 }
             }
@@ -43,7 +51,7 @@ struct KernelTests {
             halfSize: Bool = false, whiteBalance: SIMD3<Float> = SIMD3(1, 1, 1)
         ) throws -> [[SIMD3<Float>]] {
             let parameters = MetalDevelop.Parameters(
-                black: SIMD4(repeating: Self.black), whiteBalance: SIMD4(whiteBalance, 1),
+                black: blackLevels, whiteBalance: SIMD4(whiteBalance, 1),
                 matrixRow0: SIMD4(1, 0, 0, 0), matrixRow1: SIMD4(0, 1, 0, 0), matrixRow2: SIMD4(0, 0, 1, 0),
                 pattern: pattern, origin: Self.origin, size: SIMD2(UInt32(width), UInt32(height)),
                 white: Self.white)
@@ -90,6 +98,18 @@ struct KernelTests {
         }
     }
 
+    /// Black level is per mosaic position, not per colour: the two greens of a cell often
+    /// differ. Indexing it by colour, or by raw instead of picture coordinates, would leave
+    /// a faint checkerboard that a flat field makes obvious.
+    @Test(arguments: patterns)
+    func perPositionBlackLevelsAreSubtracted(_ pattern: SIMD4<UInt32>) throws {
+        let developed = try Mosaic(pattern: pattern, blackLevels: SIMD4(40, 64, 88, 120)) { _, _ in Self.flat }
+            .develop()
+        for pixel in developed.joined() {
+            #expect(simd_distance(pixel, Self.flat) < Self.tolerance)
+        }
+    }
+
     @Test func topOfPictureIsTopOfImage() throws {
         // Dark above, bright below. Metal and Core Image disagree about which way is up, and
         // getting the flip wrong still yields a perfectly valid image, upside down.
@@ -120,6 +140,36 @@ struct KernelTests {
         #expect(simd_distance(developed[4][4], SIMD3(1, 1, 1)) < Self.tolerance)
     }
 
+    /// The cases every edition of the kernel has to pass, whatever it is written in. The
+    /// Rust crate runs the same file against the WGSL kernel under wgpu.
+    @Test(arguments: ConformanceCase.all)
+    func passesSharedConformanceCase(_ test: ConformanceCase) throws {
+        let p = test.params
+        func lane4(_ values: [Float]) -> SIMD4<Float> { SIMD4(values[0], values[1], values[2], values[3]) }
+        let parameters = MetalDevelop.Parameters(
+            black: lane4(p.black), whiteBalance: lane4(p.whiteBalance), matrixRow0: lane4(p.matrix[0]),
+            matrixRow1: lane4(p.matrix[1]), matrixRow2: lane4(p.matrix[2]),
+            pattern: SIMD4(p.pattern[0], p.pattern[1], p.pattern[2], p.pattern[3]),
+            origin: SIMD2(p.origin[0], p.origin[1]), size: SIMD2(p.size[0], p.size[1]), white: p.white)
+        let image = try test.mosaic.withUnsafeBytes { bytes in
+            try #require(MetalDevelop.shared).develop(
+                mosaic: bytes.baseAddress!, rowBytes: test.rawWidth * 2, rawWidth: test.rawWidth,
+                rawHeight: test.rawHeight, parameters: parameters, halfSize: test.halfSize)
+        }
+        let developed = pixels(of: image)
+        let tolerance = ConformanceCase.tolerance
+
+        if let expected = test.everyPixel {
+            for pixel in developed.joined() {
+                #expect(simd_distance(pixel, SIMD3(expected[0], expected[1], expected[2])) < tolerance)
+            }
+        }
+        for check in test.pixels ?? [] {
+            let expected = SIMD3(check.rgb[0], check.rgb[1], check.rgb[2])
+            #expect(simd_distance(developed[check.y][check.x], expected) < tolerance)
+        }
+    }
+
     /// The Swift struct and the shader struct are read as the same bytes. If these move,
     /// `Params` in the shader source has to move with them.
     @Test func parameterLayoutMatchesShader() {
@@ -133,4 +183,42 @@ struct KernelTests {
         #expect(Layout.offset(of: \.white) == 112)
         #expect(Layout.stride == 128)
     }
+}
+
+/// One entry of Conformance/kernel-cases.json, written by Scripts/conformance.py.
+struct ConformanceCase: Decodable, CustomTestStringConvertible {
+    struct Params: Decodable {
+        let black, whiteBalance: [Float]
+        let matrix: [[Float]]
+        let pattern, origin, size: [UInt32]
+        let white: Float
+    }
+
+    struct PixelCheck: Decodable {
+        let x, y: Int
+        let rgb: [Float]
+    }
+
+    let name: String
+    let halfSize: Bool
+    let rawWidth, rawHeight: Int
+    let mosaic: [UInt16]
+    let params: Params
+    let everyPixel: [Float]?
+    let pixels: [PixelCheck]?
+
+    var testDescription: String { name }
+
+    private struct Document: Decodable {
+        let tolerance: Float
+        let cases: [ConformanceCase]
+    }
+
+    private static let document: Document? = {
+        let url = Fixtures.root.appending(path: "Conformance/kernel-cases.json")
+        return (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Document.self, from: $0) }
+    }()
+
+    static var all: [ConformanceCase] { document?.cases ?? [] }
+    static var tolerance: Float { document?.tolerance ?? 0.004 }
 }

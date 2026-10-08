@@ -71,7 +71,7 @@ struct PreviewAgreementTests {
 
     /// The camera's preview has its own brightness and contrast; only hue is evidence.
     @Test func brightnessAloneIsNotDisagreement() throws {
-        // About two thirds of a stop darker. (Near black the measure deliberately loses
+        // About two thirds of a stop darker. (Near black the measure loses
         // interest, since hue there is mostly noise, so the test stays out of the shadows.)
         let darker = picture(tint: CIColor(red: 0.8, green: 0.8, blue: 0.8))
         #expect(try distance(darker, from: picture()) < 0.03)
@@ -146,8 +146,12 @@ struct RobustnessTests {
     }
 
     @Test func randomBytes() throws {
-        var generator = SystemRandomNumberGenerator()
-        let bytes = (0..<65_536).map { _ in UInt8.random(in: .min ... .max, using: &generator) }
+        // A fixed seed: a failure has to be reproducible to be worth anything.
+        var state: UInt64 = 0x5EED
+        let bytes = (0..<65_536).map { _ -> UInt8 in
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return UInt8(truncatingIfNeeded: state >> 33)
+        }
         let url = try temporaryFile(Data(bytes), extension: "cr3")
         defer { try? FileManager.default.removeItem(at: url) }
         expectRejected(url)

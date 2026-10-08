@@ -4,18 +4,18 @@ import RawShim
 
 /// The fallback route: LibRaw decodes the sensor data, then one of two paths develops it.
 ///
-/// **GPU path** — plain Bayer sensors, which is most cameras. LibRaw only decompresses;
+/// **GPU path**: plain Bayer sensors, which is most cameras. LibRaw only decompresses;
 /// `MetalDevelop` does black level, white balance, demosaicing and colour conversion in a
 /// compute kernel. Fast (tenths of a second) and entirely ours to improve.
 ///
-/// **CPU path** — everything else: X-Trans, Foveon, monochrome sensors, already-demosaiced
+/// **CPU path**: everything else: X-Trans, Foveon, monochrome sensors, already-demosaiced
 /// files, and Bayer sensors that need corrections only LibRaw knows (Phase One backs, Fuji
 /// SuperCCD). LibRaw's own pipeline develops it, single-threaded. Slow (seconds), but it
 /// encodes twenty years of per-camera knowledge that is not worth reimplementing for
 /// formats that only reach this code when Apple's decoder has already refused them.
 ///
 /// Both paths produce the same thing: an upright, scene-linear image with sRGB primaries.
-/// The shim decides which path a file can take (`rik_info.metal_ready`).
+/// The core decides which path a file can take (`rik_info.plain_bayer`).
 enum FallbackRawDecoder {
     struct Result {
         var image: CIImage
@@ -23,6 +23,7 @@ enum FallbackRawDecoder {
         var info: RawInfo
         var exposureEV: Double
         var isHalfSize: Bool
+        var path: RawFallbackPath
         var previewDistance: Double?
     }
 
@@ -30,6 +31,8 @@ enum FallbackRawDecoder {
 
     static func decode(_ url: URL, options: RawDecodeOptions) throws -> Result {
         let file = try LibRawFile(url)
+        file.setMemoryLimit(megabytes: options.fallbackMemoryLimitMB)
+        if let isCancelled = options.isCancelled { file.setCancellation(isCancelled) }
         var result = try develop(file, options: options)
         if options.checksColorAgainstPreview,
            let preview = try? RawPreview.embedded(in: file, maxPixelSize: 512) {
@@ -55,21 +58,27 @@ enum FallbackRawDecoder {
         var info = RawInfo(raw)
         let wantsHalf = info.width * info.height > options.halfSizeAbovePixels
 
-        if raw.metal_ready == 1, let metal = MetalDevelop.shared {
-            let parameters = MetalDevelop.Parameters(raw)
+        if let core = file.developParameters, let metal = MetalDevelop.shared {
+            let parameters = MetalDevelop.Parameters(core)
             // The GPU can fail where the CPU would not: an app in the background may not
             // submit GPU work, a very large frame can exhaust GPU memory, and some old raw
             // planes exceed the texture size limit. None of that is a reason to fail the
             // file, so any error here falls through to LibRaw's development.
-            let developed = file.withMosaic { samples, rowBytes in
-                try? metal.develop(
-                    mosaic: samples, rowBytes: rowBytes, rawWidth: Int(raw.raw_width),
-                    rawHeight: Int(raw.raw_height), parameters: parameters, halfSize: wantsHalf)
-            }
-            if let image = developed ?? nil {
-                return Result(
-                    image: image.oriented(info.orientation), decoder: "LibRaw \(version) + Metal",
-                    info: info, exposureEV: ExposureEstimate.measure(image), isHalfSize: wantsHalf)
+            do {
+                let developed = try file.withMosaic { samples, rowBytes in
+                    try metal.develop(
+                        mosaic: samples, rowBytes: rowBytes, rawWidth: Int(raw.raw_width),
+                        rawHeight: Int(raw.raw_height), parameters: parameters, halfSize: wantsHalf)
+                }
+                if let image = developed {
+                    return Result(
+                        image: image.oriented(info.orientation), decoder: "LibRaw \(version) + Metal",
+                        info: info, exposureEV: ExposureEstimate.measure(image), isHalfSize: wantsHalf, path: .gpu)
+                }
+            } catch {
+                // Not fatal, but not silent either: the file is about to take seconds
+                // instead of tenths, and whoever runs the app should be able to see why.
+                options.eventHandler?(.gpuDevelopFailed(camera: info.camera, reason: error.localizedDescription))
             }
         }
 
@@ -77,7 +86,13 @@ enum FallbackRawDecoder {
             let width = Int(developed.width), height = Int(developed.height)
             let channels = Int(developed.channels)
             guard let source = developed.pixels, width > 0, height > 0 else {
-                throw RawError.renderFailed(reason: "LibRaw returned an empty image")
+                throw RawError.renderFailed(reason: "the decoder returned an empty image")
+            }
+            // The size comes from the file. Check it against the limit before allocating.
+            // Compared in megabytes: the limit can legitimately be `Int.max`, and turning
+            // that into bytes would overflow.
+            guard width * height * 8 / 1_048_576 <= options.fallbackMemoryLimitMB else {
+                throw RawError.exceedsMemoryLimit
             }
 
             // Core Image has no 16-bit three-channel format, so the pixels are widened to
@@ -108,7 +123,7 @@ enum FallbackRawDecoder {
             info.height = height * (isHalf ? 2 : 1)
             return Result(
                 image: image.oriented(info.orientation), decoder: "LibRaw \(version) CPU", info: info,
-                exposureEV: ExposureEstimate.measure(image), isHalfSize: isHalf)
+                exposureEV: ExposureEstimate.measure(image), isHalfSize: isHalf, path: .cpu)
         }
     }
 }

@@ -9,7 +9,7 @@ import Foundation
 /// kinds of photograph depending on which decoder happened to open each file.
 ///
 /// `RawLook` is that step, applied identically whichever decoder produced the data. It is
-/// deliberately small: one contrast curve, saturation, a tint for shadows and highlights,
+/// small: one contrast curve, saturation, a tint for shadows and highlights,
 /// and a fade. That is enough to prove that the decoders' output is interchangeable as
 /// input to an editor, and to carry a recognisable style. It is not a film-emulation
 /// engine, and a real product would put its own pipeline here.

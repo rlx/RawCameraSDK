@@ -49,11 +49,17 @@ struct ExposureEstimate {
     /// shared rendering step can only make two decoders' pictures match if their default
     /// brightness is decided the same way, from the same kind of evidence. Measuring each
     /// decoder's data with its own method (sensor samples for one, rendered pixels for the
-    /// other) left the two about a third further apart in tests over 51 files.
+    /// other) left the two visibly further apart.
     ///
     /// The image is reduced to at most 384 pixels on its long edge first. That is plenty for
-    /// a percentile, costs a few milliseconds, and averages away single hot pixels that
-    /// would otherwise set the white point.
+    /// a percentile and averages away single hot pixels that would otherwise set the
+    /// white point.
+    ///
+    /// This is automatic exposure per picture, and it has the usual drawback: it removes
+    /// the photographer's intent from a dark frame, and it makes the frames of
+    /// a bracketed series come out alike. It is a default for viewing, exposed as
+    /// `suggestedExposureEV` so a caller can ignore it. A product would use a calibrated
+    /// baseline per camera and leave the picture's own exposure alone.
     static func measure(_ image: CIImage) -> Double {
         let extent = image.extent
         guard !extent.isEmpty, !extent.isInfinite else { return 0 }

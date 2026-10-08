@@ -9,6 +9,14 @@ public enum RawRoute: String, Sendable, Codable {
     case fallback
 }
 
+/// Which of the fallback's two development paths produced an image.
+public enum RawFallbackPath: String, Sendable, Codable {
+    /// Developed by the Metal kernel: plain Bayer sensors.
+    case gpu
+    /// Developed by the fallback decoder's own CPU pipeline: everything else.
+    case cpu
+}
+
 /// A decoded RAW file.
 public struct RawImage: Sendable {
     /// The picture: linear light, in Core Image's working space, rotated upright.
@@ -33,6 +41,9 @@ public struct RawImage: Sendable {
     public let image: CIImage
 
     public let route: RawRoute
+
+    /// On the fallback route, which path developed the image; `nil` on the Apple route.
+    public let fallbackPath: RawFallbackPath?
 
     /// True when `image` is scene-linear: proportional to the light the sensor recorded,
     /// with no tone curve applied. Always true on the fallback route; true on the Apple
@@ -73,17 +84,12 @@ public struct RawImage: Sendable {
     /// `RawDecodeOptions.halfSizeAbovePixels`.
     public let isHalfSize: Bool
 
-    /// Wall-clock time `RawInput.open` took. The two routes do different amounts of work
-    /// inside `open`: the fallback decodes and develops everything, while Apple's decoder
-    /// defers the decode itself to render time and spends `open` on set-up and, for the
-    /// first file of each kind, the support check. Use it to compare fallback paths with each
-    /// other, not to compare the routes; `rawprobe bench` does that properly.
-    public let openSeconds: Double
-
     public init(
-        image: CIImage, route: RawRoute, isSceneLinear: Bool, decoder: String, info: RawInfo,
-        suggestedExposureEV: Double, previewDistance: Double? = nil, isHalfSize: Bool, openSeconds: Double
+        image: CIImage, route: RawRoute, fallbackPath: RawFallbackPath? = nil, isSceneLinear: Bool,
+        decoder: String, info: RawInfo, suggestedExposureEV: Double, previewDistance: Double? = nil,
+        isHalfSize: Bool
     ) {
+        self.fallbackPath = fallbackPath
         self.previewDistance = previewDistance
         self.image = image
         self.route = route
@@ -92,7 +98,6 @@ public struct RawImage: Sendable {
         self.info = info
         self.suggestedExposureEV = suggestedExposureEV
         self.isHalfSize = isHalfSize
-        self.openSeconds = openSeconds
     }
 
     /// `image` made ready to show: `suggestedExposureEV` plus `exposureEV` applied in linear

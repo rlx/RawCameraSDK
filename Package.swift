@@ -49,7 +49,9 @@ let package = Package(
         // The library. The only target that imports RawShim.
         .target(
             name: "RawInputKit",
-            dependencies: ["RawShim"]
+            dependencies: ["RawShim"],
+            // Declares the one required-reason API in the dependency tree: LibRaw's stat().
+            resources: [.copy("PrivacyInfo.xcprivacy")]
         ),
         // Measuring tools for macOS: coverage probe, benchmark, side-by-side comparisons.
         .executableTarget(

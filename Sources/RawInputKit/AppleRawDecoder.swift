@@ -3,7 +3,7 @@ import Foundation
 
 /// The Apple route: a thin layer over `CIRAWFilter`.
 ///
-/// There is deliberately little here. Apple's engine already does demosaicing, lens
+/// There is little here. Apple's engine already does demosaicing, lens
 /// correction, noise reduction and tone mapping for the cameras it supports, and it gains
 /// new cameras with OS updates. The work in this file is knowing when it will *not* work.
 enum AppleRawDecoder {
@@ -64,9 +64,9 @@ enum AppleRawDecoder {
     /// scale. That is cheaper than a scaled-down version of the whole picture, because
     /// `scaleFactor` still has the engine demosaic every pixel before shrinking, while a
     /// small region lets Core Image skip the tiles it does not need. The sensor data still
-    /// has to be decompressed up to that region, so this is not free: in a fresh process
-    /// it adds 0.1 to 0.7 s on an M-series Mac, which is why `RawInput.open` remembers the
-    /// answer per camera and mode instead of asking for every file.
+    /// has to be decompressed up to that region, so this is not free (the README has the
+    /// figures), which is why `RawInput.open` remembers a "yes" per camera and mode instead
+    /// of asking for every file.
     static func canDecode(_ url: URL) -> Bool {
         guard let filter = CIRAWFilter(imageURL: url),
               let image = filter.outputImage, !image.extent.isEmpty, !image.extent.isInfinite

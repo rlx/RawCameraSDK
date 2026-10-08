@@ -11,7 +11,7 @@ import RawShim
 ///   Apple's look (tone curve, lens correction, noise reduction) and costs nothing to ship.
 /// - **The fallback**: LibRaw decodes the sensor data and RawInputKit develops it, on the GPU
 ///   for ordinary Bayer sensors and with LibRaw's own CPU pipeline for everything else. It
-///   opens formats Apple never supported, and its output is deliberately plain.
+///   opens formats Apple never supported, and its output is plain.
 ///
 /// `open` picks between them per file. Neither decoder is a superset of the other, so the
 /// order matters: Apple first, because it is the better result whenever it works.
@@ -55,6 +55,9 @@ public enum RawInput {
         switch options.routing {
         case .automatic:
             useApple = AppleSupport.shared.canDecode(url)
+            if !useApple, let handler = options.eventHandler, let header = try? info(url) {
+                handler(.appleRejected(camera: header.camera, routine: header.decoderRoutine))
+            }
         case .apple:
             // An explicit request is still checked. `CIRAWFilter` is lazy: for a file it
             // cannot develop it may return an image that only fails, silently, at render time.
@@ -69,17 +72,23 @@ public enum RawInput {
             // Metadata is best effort here. LibRaw cannot parse a few files Apple opens
             // (JPEG XL DNG, for one), and a decodable image is worth more than its EXIF.
             let info = (try? info(url)) ?? RawInfo(size: apple.image.extent.size)
+            options.eventHandler?(.opened(camera: info.camera, route: .apple, decoder: apple.decoder, seconds: elapsed()))
             return RawImage(
                 image: apple.image, route: .apple, isSceneLinear: options.appleRendering == .linear,
-                decoder: apple.decoder, info: info, suggestedExposureEV: apple.exposureEV,
-                isHalfSize: false, openSeconds: elapsed())
+                decoder: apple.decoder, info: info, suggestedExposureEV: apple.exposureEV, isHalfSize: false)
         }
 
         let fallback = try FallbackRawDecoder.decode(url, options: options)
-        return RawImage(
-            image: fallback.image, route: .fallback, isSceneLinear: true, decoder: fallback.decoder,
-            info: fallback.info, suggestedExposureEV: fallback.exposureEV,
-            previewDistance: fallback.previewDistance, isHalfSize: fallback.isHalfSize, openSeconds: elapsed())
+        let image = RawImage(
+            image: fallback.image, route: .fallback, fallbackPath: fallback.path, isSceneLinear: true,
+            decoder: fallback.decoder, info: fallback.info, suggestedExposureEV: fallback.exposureEV,
+            previewDistance: fallback.previewDistance, isHalfSize: fallback.isHalfSize)
+        if image.isColorSuspect, let distance = image.previewDistance {
+            options.eventHandler?(.colorSuspect(camera: image.info.camera, distance: distance))
+        }
+        options.eventHandler?(.opened(
+            camera: image.info.camera, route: .fallback, decoder: image.decoder, seconds: elapsed()))
+        return image
     }
 
     /// Camera and exposure metadata. Reads the file's header only; no sensor data is decoded.
@@ -129,10 +138,7 @@ public enum RawInput {
         return PreviewAgreement.distance(image, preview: preview)
     }
 
-    /// The fallback decoder's version, e.g. "LibRaw 0.22.2".
+    /// The fallback decoder's version, e.g. "LibRaw 0.22.2". Record it with anything that
+    /// depends on the fallback's output staying the same, such as a saved edit.
     public static var fallbackVersion: String { "LibRaw \(FallbackRawDecoder.version)" }
-
-    /// How many camera models the fallback decoder has tables for. An upper bound on what
-    /// it develops correctly, not a guarantee: see the coverage notes in the README.
-    public static var fallbackCameraCount: Int { Int(rik_camera_count()) }
 }

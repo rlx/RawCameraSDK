@@ -1,6 +1,7 @@
 import CoreImage
 import CryptoKit
 import Foundation
+import Metal
 import Testing
 import simd
 @testable import RawInputKit
@@ -69,9 +70,9 @@ struct SampleTests {
         #expect(min(preview.width, preview.height) > 32)
     }
 
-    /// Testing whether Apple supports a file costs most of a decode, so the answer is kept
-    /// per camera and mode. Two different cameras must still be tested separately.
-    @Test func appleSupportIsTestedOncePerKindOfFile() throws {
+    /// Testing whether Apple supports a file costs a good part of a decode, so a "yes" is
+    /// kept per camera and mode. Two different cameras must still be tested separately.
+    @Test func appleSupportIsRememberedPerKindOfFile() throws {
         try #require(Fixtures.samples.count >= 2)
         final class Log: @unchecked Sendable {
             private let lock = NSLock()
@@ -82,14 +83,89 @@ struct SampleTests {
         let tested = Log()
         let support = AppleSupport { url in
             tested.append(url)
-            return false
+            return true
         }
         let first = Fixtures.samples[0].url, second = Fixtures.samples[1].url
-        #expect(!support.canDecode(first))
-        #expect(!support.canDecode(first))
+        #expect(support.canDecode(first))
+        #expect(support.canDecode(first))
         #expect(tested.all == [first])
-        #expect(!support.canDecode(second))
+        #expect(support.canDecode(second))
         #expect(tested.all == [first, second])
+    }
+
+    /// A "no" may be about one damaged file, not its camera. Remembering it would send every
+    /// later file from that camera to the fallback, so each failure is tested afresh.
+    @Test func appleRejectionIsNotRemembered() throws {
+        let file = try #require(Fixtures.samples.first).url
+        final class Answers: @unchecked Sendable {
+            private let lock = NSLock()
+            private var queue = [false, true]
+            func next() -> Bool { lock.withLock { queue.removeFirst() } }
+        }
+        let answers = Answers()
+        let support = AppleSupport { _ in answers.next() }
+        #expect(!support.canDecode(file))
+        #expect(support.canDecode(file), "the second file of the same kind is tested on its own")
+    }
+
+    @Test func reportsEventsForAFallbackDecode() throws {
+        let sample = try #require(Fixtures.samples.first)
+        final class Log: @unchecked Sendable {
+            private let lock = NSLock()
+            private var events: [RawEvent] = []
+            func append(_ event: RawEvent) { lock.withLock { events.append(event) } }
+            var all: [RawEvent] { lock.withLock { events } }
+        }
+        let log = Log()
+        var options = RawDecodeOptions()
+        options.eventHandler = { log.append($0) }
+        let raw = try RawInput.open(sample.url, options: options)
+
+        // First the routing decision, last the summary; this is what an app would log to
+        // learn how often, and for which cameras, Apple's decoder turns files away.
+        guard case .appleRejected(let camera, _) = try #require(log.all.first) else {
+            Issue.record("expected the rejection first, got \(log.all)")
+            return
+        }
+        #expect(camera == raw.info.camera)
+        guard case .opened(_, let route, _, let seconds) = try #require(log.all.last) else {
+            Issue.record("expected the summary last, got \(log.all)")
+            return
+        }
+        #expect(route == .fallback && seconds > 0)
+    }
+
+    @Test func cancellationStopsAFallbackDecode() throws {
+        let sample = try #require(Fixtures.samples.first)
+        var options = RawDecodeOptions()
+        options.routing = .fallback
+        options.isCancelled = { true }
+        #expect(throws: RawError.cancelled) { try RawInput.open(sample.url, options: options) }
+    }
+
+    /// The frame size comes from the file, so the limit is what stands between a crafted
+    /// header and an allocation of whatever it asks for.
+    @Test func memoryLimitRefusesAFrameThatWouldExceedIt() throws {
+        let sample = try #require(Fixtures.samples.first)
+        var options = RawDecodeOptions()
+        options.routing = .fallback
+        options.fallbackMemoryLimitMB = 1
+        #expect(throws: RawError.exceedsMemoryLimit) { try RawInput.open(sample.url, options: options) }
+    }
+
+    /// "No limit" has to mean that, on both paths, including the arithmetic.
+    @Test(arguments: Fixtures.samples)
+    func anUnlimitedMemoryLimitIsAccepted(_ sample: Fixtures.Sample) throws {
+        var options = RawDecodeOptions()
+        options.fallbackMemoryLimitMB = .max
+        #expect(throws: Never.self) { try RawInput.open(sample.url, options: options) }
+    }
+
+    @Test(arguments: Fixtures.samples)
+    func reportsWhichPathDevelopedIt(_ sample: Fixtures.Sample) throws {
+        let raw = try RawInput.open(sample.url)
+        #expect(raw.fallbackPath != nil)
+        #expect(raw.decoder.contains(raw.fallbackPath == .gpu ? "Metal" : "CPU"))
     }
 
     /// A grid of thumbnails and a detail view decode at the same time in any real app.
@@ -176,6 +252,7 @@ struct AgreementTests {
         options.appleRendering = .linear
         let appleLinear = try RawInput.open(url, options: options)
         let fallback = try open(url, .fallback)
+        #expect(appleOwn.fallbackPath == nil && fallback.fallbackPath == .gpu)
         #expect(!appleOwn.isSceneLinear && appleLinear.isSceneLinear && fallback.isSceneLinear)
         #expect(appleLinear.suggestedExposureEV > 0, "Apple's linear output is measured, like the fallback's")
 
@@ -184,6 +261,27 @@ struct AgreementTests {
             centreColor(appleLinear.rendered(look: .film)), centreColor(fallback.rendered(look: .film)))
         #expect(shared < own, "closer after the shared step than before it")
         #expect(shared < 0.03)
+    }
+
+    /// An engine that renders with Metal takes a texture, not a `CIImage`.
+    @Test(arguments: [RawDecodeOptions.Routing.apple, .fallback])
+    func rendersIntoAMetalTexture(_ routing: RawDecodeOptions.Routing) throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        var options = RawDecodeOptions.sceneLinear
+        options.routing = routing
+        let raw = try RawInput.open(url, options: options)
+        let texture = try raw.makeTexture(device: device)
+        #expect(texture.width == Int(raw.image.extent.width) && texture.height == Int(raw.image.extent.height))
+        #expect(texture.pixelFormat == .rgba16Float)
+
+        // Same values as the image, and the right way up: compare the top-left corner.
+        let fromTexture = try #require(CIImage(mtlTexture: texture, options: [
+            .colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
+        ])).oriented(.downMirrored)
+        let corner = CGRect(x: 0, y: raw.image.extent.height - 64, width: 64, height: 64)
+        let expected = centreColor(raw.image.cropped(to: corner))
+        let actual = centreColor(fromTexture.cropped(to: corner))
+        #expect(simd_distance(expected, actual) < 0.01)
     }
 
     /// The in-camera crop lives in metadata; the sensor data is the full 3:2 frame. A

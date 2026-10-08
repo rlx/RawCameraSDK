@@ -37,9 +37,8 @@ public struct RawDecodeOptions: Sendable {
     /// width and height, by merging each 2x2 cell of the mosaic into one pixel.
     ///
     /// This exists for memory. A developed frame is held as 16-bit float RGBA, 8 bytes per
-    /// pixel, so 100 MP needs about 800 MB before anything is done with it. A recent iPhone
-    /// with 8 GB tolerated more than that in testing; older phones have half the memory or
-    /// less, and the threshold is set for them.
+    /// pixel, so 100 MP needs about 800 MB before anything is done with it. The threshold is
+    /// set with phones of 4 GB or less in mind.
     ///
     /// It is a threshold, not a cap. The frame is halved once, and only mosaic sensors can
     /// be halved; Foveon, monochrome and already-demosaiced files come out at full size
@@ -47,15 +46,39 @@ public struct RawDecodeOptions: Sendable {
     /// ignores it: `CIRAWFilter` renders lazily, in tiles, and manages its own memory.
     public var halfSizeAbovePixels: Int = 64_000_000
 
+    /// Fallback route only: the most memory, in megabytes, the decoder may allocate for one
+    /// file's sensor data and developed frame. A file whose header asks for more is refused
+    /// with `RawError.exceedsMemoryLimit`. Dimensions come from the file, so without a limit
+    /// a damaged or hostile header can ask for gigabytes.
+    public var fallbackMemoryLimitMB = 1024
+
+    /// Fallback route only: polled between decoding stages; return true to abandon the
+    /// decode, which then throws `RawError.cancelled`. The slowest files take seconds, and
+    /// a user who has scrolled away should not have to wait for them. Called on the
+    /// decoding thread.
+    public var isCancelled: (@Sendable () -> Bool)?
+
+    /// Receives `RawEvent`s as the file is opened: routing decisions, GPU failures, suspect
+    /// colour. Called on the decoding thread.
+    public var eventHandler: (@Sendable (RawEvent) -> Void)?
+
     /// Fallback route only: compare the developed image with the camera's embedded preview
     /// and report the result in `RawImage.previewDistance`.
     ///
     /// The fallback can decode a file without error and still get its colours wrong, most
     /// often for a camera newer than LibRaw's tables. This is how a caller finds out. It
-    /// costs one small JPEG decode and two tiny renders: together with measuring exposure,
-    /// 0.04 to 0.12 s on an iPhone 16 Pro Max, the high end for files whose embedded
+    /// costs one small JPEG decode and two tiny renders, most for files whose embedded
     /// preview is full-size. Turn it off for bulk work where nobody will act on the answer.
     public var checksColorAgainstPreview = true
 
     public init() {}
+
+    /// Options for a caller that renders the picture itself: scene-linear data from Apple's
+    /// decoder as well as from the fallback, ready for `RawImage.rendered(look:)` or an
+    /// editor's own pipeline.
+    public static var sceneLinear: RawDecodeOptions {
+        var options = RawDecodeOptions()
+        options.appleRendering = .linear
+        return options
+    }
 }

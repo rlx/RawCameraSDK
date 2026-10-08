@@ -12,13 +12,16 @@ enum Render {
         case "fallback": options.routing = .fallback
         default: options.routing = .automatic
         }
+        let start = ContinuousClock.now
         let raw = try RawInput.open(input, options: options)
+        let elapsed = (ContinuousClock.now - start).components
+        let seconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18
         let display = raw.displayImage()
         let scale = min(1, 2048 / max(display.extent.width, display.extent.height))
         try CIContext().writeJPEGRepresentation(
             of: display.transformed(by: CGAffineTransform(scaleX: scale, y: scale)), to: output,
             colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
         print("\(raw.decoder), \(Int(raw.image.extent.width))x\(Int(raw.image.extent.height)), "
-            + String(format: "%+.2f EV, %.2f s", raw.suggestedExposureEV, raw.openSeconds))
+            + String(format: "%+.2f EV, opened in %.2f s", raw.suggestedExposureEV, seconds))
     }
 }

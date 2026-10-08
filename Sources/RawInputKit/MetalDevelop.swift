@@ -17,7 +17,7 @@ import RawShim
 ///
 /// **Demosaicing** is Hamilton-Adams: green is interpolated along whichever direction,
 /// horizontal or vertical, has the smaller gradient; red and blue are then interpolated as
-/// differences from green, which vary slowly across an image. It is a deliberately modest
+/// differences from green, which vary slowly across an image. It is a modest
 /// algorithm: no patents in force, a few dozen texture reads per pixel, and good enough to
 /// judge a picture. The better-known AMaZE and RCD are GPL and cannot be used here.
 ///
@@ -67,8 +67,8 @@ final class MetalDevelop: @unchecked Sendable {
             return nil
         }
         do {
-            // The shader is compiled from source at first use, about 20 ms, instead of
-            // shipping as a .metal file. `swift build` and `swift test` do not run the Metal
+            // The shader is compiled from source at first use instead of shipping as a
+            // .metal file. `swift build` and `swift test` do not run the Metal
             // compiler, so a precompiled library would only exist in Xcode builds.
             let library = try device.makeLibrary(source: Self.source, options: nil)
             guard let full = library.makeFunction(name: "develop_full"),
@@ -277,22 +277,18 @@ final class MetalDevelop: @unchecked Sendable {
 }
 
 extension MetalDevelop.Parameters {
-    /// Builds kernel parameters from the shim's description of an unpacked Bayer file.
-    init(_ raw: rik_info) {
-        // White balance arrives with green at 1. It is rescaled so the *smallest* multiplier
-        // is 1: every channel then reaches or passes 1 when the sensor saturates, and the
-        // kernel's clip leaves blown highlights neutral.
-        let multipliers = SIMD3(raw.wb.0, raw.wb.1, raw.wb.2)
-        let matrix = raw.rgb_cam
+    /// The core's parameter block, field for field. Both are the kernel's uniform block;
+    /// the core's version is the definition and this one exists to give the fields types.
+    init(_ core: rik_develop_params) {
         self.init(
-            black: SIMD4(raw.black.0, raw.black.1, raw.black.2, raw.black.3),
-            whiteBalance: SIMD4(multipliers / multipliers.min(), 1),
-            matrixRow0: SIMD4(matrix.0, matrix.1, matrix.2, 0),
-            matrixRow1: SIMD4(matrix.3, matrix.4, matrix.5, 0),
-            matrixRow2: SIMD4(matrix.6, matrix.7, matrix.8, 0),
-            pattern: SIMD4(UInt32(raw.bayer.0), UInt32(raw.bayer.1), UInt32(raw.bayer.2), UInt32(raw.bayer.3)),
-            origin: SIMD2(raw.left_margin, raw.top_margin),
-            size: SIMD2(raw.width, raw.height),
-            white: raw.white)
+            black: SIMD4(core.black.0, core.black.1, core.black.2, core.black.3),
+            whiteBalance: SIMD4(core.white_balance.0, core.white_balance.1, core.white_balance.2, core.white_balance.3),
+            matrixRow0: SIMD4(core.matrix_row0.0, core.matrix_row0.1, core.matrix_row0.2, core.matrix_row0.3),
+            matrixRow1: SIMD4(core.matrix_row1.0, core.matrix_row1.1, core.matrix_row1.2, core.matrix_row1.3),
+            matrixRow2: SIMD4(core.matrix_row2.0, core.matrix_row2.1, core.matrix_row2.2, core.matrix_row2.3),
+            pattern: SIMD4(core.pattern.0, core.pattern.1, core.pattern.2, core.pattern.3),
+            origin: SIMD2(core.origin.0, core.origin.1),
+            size: SIMD2(core.size.0, core.size.1),
+            white: core.white)
     }
 }

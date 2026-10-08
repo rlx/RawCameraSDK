@@ -1,6 +1,6 @@
 import CoreImage
 import Foundation
-import RawInputKit
+@_spi(Measurement) import RawInputKit
 
 /// `rawprobe <folder>`: runs every file through both decoders and records what happened.
 /// The output is the evidence for the coverage table in the README.
@@ -14,6 +14,8 @@ enum Probe {
         var layout = "?"
         /// LibRaw's decoding routine: in effect, the compression mode.
         var routine = "?"
+        /// The year the picture was taken, from its metadata; 0 if unknown.
+        var captureYear = 0
         /// Apple's decoder develops the file.
         var apple = false
         /// The fallback develops the file, to actual pixels.
@@ -37,6 +39,7 @@ enum Probe {
             row.megapixels = info.megapixels
             row.layout = info.layout?.rawValue ?? "?"
             row.routine = info.decoderRoutine ?? "?"
+            row.captureYear = info.captureDate.map { Calendar(identifier: .gregorian).component(.year, from: $0) } ?? 0
         }
         row.apple = RawInput.appleCanDecode(url)
 
@@ -50,14 +53,16 @@ enum Probe {
 
         options.routing = .fallback
         do {
+            let start = ContinuousClock.now
             let raw = try RawInput.open(url, options: options)
+            let elapsed = (ContinuousClock.now - start).components
+            row.fallbackSeconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18
             // Decoding without error is not enough to count: render a centre crop and
             // require that real pixels come out.
             let extent = raw.image.extent
             let crop = extent.insetBy(dx: extent.width * 0.45, dy: extent.height * 0.45)
-            row.fallback = FullRender.run(raw.image.cropped(to: crop), context: context)
+            row.fallback = RawMeasurement.renderFully(raw.image.cropped(to: crop), context: context)
             row.fallbackDecoder = raw.decoder
-            row.fallbackSeconds = raw.openSeconds
             row.fallbackPreviewDistance = raw.previewDistance
         } catch {
             row.fallbackError = error.localizedDescription
