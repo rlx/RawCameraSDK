@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Writes Conformance/kernel-cases.json: small sensor mosaics with known answers.
+
+Every implementation of the development kernel has to reproduce these, whatever it is
+written in: the Metal kernel in the Swift package, the WGSL kernel under wgpu in the Rust
+crate, and any future port. They are what makes "the same kernel" a checked statement
+instead of an intention.
+
+Each case is a picture of `size` pixels sitting inside a larger raw plane, as in a real
+file. The border stands in for the sensor's masked pixels and is filled with 65535, so a
+kernel that reads outside the picture produces visibly wrong output.
+
+Real photographs cannot pin these properties. A picture developed with the mosaic pattern
+shifted by a pixel, or upside down, is still a plausible-looking picture.
+"""
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+ORIGIN = (2, 1)
+SIZE = (8, 8)
+BLACK, WHITE = 64.0, 1064.0
+IDENTITY = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+PATTERNS = {"rggb": [0, 1, 1, 2], "bggr": [2, 1, 1, 0], "grbg": [1, 0, 2, 1], "gbrg": [1, 2, 0, 1]}
+FLAT = [0.2, 0.5, 0.8]
+
+
+def mosaic(pattern, color, black_levels):
+    """`color(x, y)` is the scene colour at a picture coordinate, 0..1 per channel; each
+    sensor site records only its own channel of it."""
+    raw_width, raw_height = SIZE[0] + 5, SIZE[1] + 3
+    samples = [65535] * (raw_width * raw_height)
+    for y in range(SIZE[1]):
+        for x in range(SIZE[0]):
+            position = (y & 1) * 2 + (x & 1)
+            black = black_levels[position]
+            level = black + color(x, y)[pattern[position]] * (WHITE - black)
+            samples[(y + ORIGIN[1]) * raw_width + x + ORIGIN[0]] = int(level)
+    return raw_width, raw_height, samples
+
+
+def case(name, pattern, color, expect, why, half=False, black_levels=None, white_balance=None):
+    black_levels = black_levels or [BLACK] * 4
+    raw_width, raw_height, samples = mosaic(pattern, color, black_levels)
+    return {
+        "name": name,
+        "why": why,
+        "halfSize": half,
+        "rawWidth": raw_width,
+        "rawHeight": raw_height,
+        "mosaic": samples,
+        "params": {
+            "black": black_levels,
+            "whiteBalance": (white_balance or [1, 1, 1]) + [1],
+            "matrix": IDENTITY,
+            "pattern": pattern,
+            "origin": list(ORIGIN),
+            "size": list(SIZE),
+            "white": WHITE,
+        },
+        # Either one colour every output pixel must have, or particular pixels to check.
+        **expect,
+    }
+
+
+def cases():
+    out = []
+    for name, pattern in PATTERNS.items():
+        flat = lambda x, y: FLAT
+        out.append(case(
+            f"flat-{name}", pattern, flat, {"everyPixel": FLAT},
+            "A flat colour must survive demosaicing at every pixel, borders included: a wrong "
+            "pattern index, a wrong origin or a read of the masked border each change some."))
+        out.append(case(
+            f"half-{name}", pattern, flat, {"everyPixel": FLAT}, half=True,
+            why="Half size merges each 2x2 cell into one pixel: its red, its blue, the mean of its greens."))
+        out.append(case(
+            f"black-levels-{name}", pattern, flat, {"everyPixel": FLAT}, black_levels=[40.0, 64.0, 88.0, 120.0],
+            why="Black level is per mosaic position, not per colour, and indexed in picture "
+                "coordinates. Getting that wrong leaves a checkerboard on a flat field."))
+
+    rggb = PATTERNS["rggb"]
+    grey = lambda v: [v, v, v]
+    out.append(case(
+        "top-is-top", rggb, lambda x, y: grey(0.1 if y < 4 else 0.9),
+        {"pixels": [{"x": 4, "y": 0, "rgb": grey(0.1)}, {"x": 4, "y": 7, "rgb": grey(0.9)}]},
+        "Row 0 of the output is the top of the picture. Graphics APIs disagree about which way "
+        "is up, and a flipped image is still a valid image."))
+    out.append(case(
+        "left-is-left", rggb, lambda x, y: grey(0.1 if x < 4 else 0.9),
+        {"pixels": [{"x": 0, "y": 4, "rgb": grey(0.1)}, {"x": 7, "y": 4, "rgb": grey(0.9)}]},
+        "Column 0 of the output is the left of the picture."))
+    out.append(case(
+        "white-balance", rggb, lambda x, y: [0.2, 0.4, 0.2], {"everyPixel": [0.4, 0.4, 0.3]},
+        white_balance=[2.0, 1.0, 1.5], why="Each multiplier scales its own channel."))
+    out.append(case(
+        "blown-highlights", rggb, lambda x, y: [1.0, 1.0, 1.0], {"everyPixel": [1.0, 1.0, 1.0]},
+        white_balance=[2.2, 1.0, 1.6],
+        why="A saturated sensor reads white in every channel. White balance must not push red "
+            "and blue past green, or highlights turn magenta: clip after white balance."))
+    return out
+
+
+if __name__ == "__main__":
+    document = {
+        "format": 1,
+        # Output is 16-bit float and sample levels are integers; both round.
+        "tolerance": 0.004,
+        "note": "Generated by Scripts/conformance.py. Output is linear RGB, row 0 at the top.",
+        "cases": cases(),
+    }
+    path = ROOT / "Conformance" / "kernel-cases.json"
+    path.write_text(json.dumps(document, indent=1) + "\n")
+    print(f"{len(document['cases'])} cases -> {path.relative_to(ROOT)}")

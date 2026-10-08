@@ -7,3 +7,5 @@ Examples/RawInputDemo/Samples/files/
 .swiftpm/
 fuzz-findings/
 __pycache__/
+Bindings/web/dist/
+Bindings/rust/target/

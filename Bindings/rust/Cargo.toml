@@ -1,0 +1,29 @@
+[package]
+name = "rawinput"
+version = "0.1.0"
+edition = "2021"
+description = "Camera RAW decoding through the RawInputKit portable core, with a wgpu development kernel"
+license = "MIT"
+publish = false
+
+[features]
+# The WGSL development kernel, run through wgpu. Off by default so the decoder can be used
+# without a GPU stack.
+gpu = ["dep:wgpu", "dep:bytemuck"]
+
+[dependencies]
+wgpu = { version = "30", optional = true }
+bytemuck = { version = "1", optional = true }
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+pollster = "1"
+half = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[test]]
+name = "conformance"
+required-features = ["gpu"]
