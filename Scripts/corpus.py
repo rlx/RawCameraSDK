@@ -5,7 +5,7 @@
     corpus.py fetch                  download and SHA-256 verify the pool into Tests/Corpus (19 GB)
     corpus.py fetch --only A B ...   only files whose name contains one of the given strings
 
-The pool is deliberately wider than what ends up in the demo app: it is what
+The pool is wider than what ends up in the demo app: it is what
 `rawprobe` runs over to find out which files Apple's decoder rejects.
 """
 import hashlib

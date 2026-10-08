@@ -21,9 +21,11 @@ Every launch brings the app to the front of the phone for a moment, so the defau
 short session: at most 15 launches, one run each. Measurements are taken in order of how
 much they tell you, and the list is cut where the limit falls:
 
-  1. the shared files through both decoders   (the Apple-against-fallback comparison)
-  2. the samples through the fallback         (the formats Apple cannot open)
-  3. the samples through Apple's decoder      (confirms it still rejects them)
+  1. the shared files through Apple's decoder asked for scene-linear output, and through
+     the fallback                             (the comparison a caller doing its own rendering needs)
+  2. the shared files through Apple's decoder at its default rendering
+  3. the samples through the fallback         (the formats Apple cannot open)
+  4. the samples through Apple's decoder      (confirms it still rejects them)
 
 `--limit 0` removes the cap. The figures in the README came from `--limit 0 --runs 3`.
 
@@ -34,6 +36,7 @@ import json
 import statistics
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -58,12 +61,20 @@ def copy_to_documents(device, source, name):
 
 def launch(device, name, route):
     """One measurement. Returns the app's result, or a row saying why there is none."""
-    try:
-        result = devicectl(
-            device, "process launch", "--console", "--terminate-existing", BUNDLE_ID, "--",
-            "-benchmarkFile", name, "-benchmarkRoute", route)
-    except subprocess.TimeoutExpired:
-        return {"file": name, "route": route, "error": "timed out"}
+    # A locked phone refuses to launch anything. That says nothing about the decoder, so
+    # wait for it to be unlocked instead of recording a failure.
+    for attempt in range(24):
+        try:
+            result = devicectl(
+                device, "process launch", "--console", "--terminate-existing", BUNDLE_ID, "--",
+                "-benchmarkFile", name, "-benchmarkRoute", route)
+        except subprocess.TimeoutExpired:
+            return {"file": name, "route": route, "error": "timed out"}
+        if "ocked" not in result.stdout + result.stderr:  # "Locked", "could not be unlocked"
+            break
+        if attempt == 0:
+            print("the device is locked; unlock it to continue", flush=True)
+        time.sleep(5)
     for line in result.stdout.splitlines():
         if line.startswith(MARKER):
             return json.loads(line[len(MARKER):])
@@ -117,7 +128,8 @@ def main():
         shared_files.append((entry["camera"], source, f"shared-{index}{source.suffix.lower()}"))
 
     # In order of value; see the module comment.
-    plan = [(name, "shared", route) for _, _, name in shared_files for route in ("apple", "fallback")]
+    plan = [(name, "shared", route) for _, _, name in shared_files for route in ("apple-linear", "fallback")]
+    plan += [(name, "shared", "apple") for _, _, name in shared_files]
     plan += [(sample["file"], "samples", "fallback") for sample in samples]
     plan += [(sample["file"], "samples", "apple") for sample in samples]
     if limit:

@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Build and test
+  swift:
+    name: Swift package and demo
     # GitHub's Xcode 27 image, the toolchain the project is developed with. It is a preview
     # image; move to the macOS label that carries Xcode 27 once one is generally available.
     runs-on: xcode-27
@@ -45,3 +45,47 @@ jobs:
           xcodebuild build \
             -project Examples/RawInputDemo/RawInputDemo.xcodeproj -scheme RawInputDemo \
             -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet
+
+      # The Rust crate with its WGSL kernel, on the same machine so it has a GPU to run on.
+      - name: Rust crate
+        working-directory: Bindings/rust
+        run: cargo test --features gpu
+
+  portable:
+    name: Portable core on Linux, and WebAssembly
+    # Not a Mac on purpose: the core claims to need nothing from Apple, and this is the check.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Restore sample files
+        uses: actions/cache@v4
+        with:
+          path: Examples/RawInputDemo/Samples/files
+          key: samples-${{ hashFiles('Examples/RawInputDemo/Samples/manifest.json') }}
+          enableCrossOsArchive: true
+
+      - name: Fetch sample files
+        run: Examples/RawInputDemo/Scripts/fetch-samples.sh
+
+      - name: Core, built with CMake and run from C
+        run: |
+          cmake -S . -B .build/cmake
+          cmake --build .build/cmake -j 4
+          ctest --test-dir .build/cmake --output-on-failure
+
+      # The decoder only: a hosted Linux runner has no GPU for the WGSL kernel.
+      - name: Rust crate
+        working-directory: Bindings/rust
+        run: cargo test
+
+      - uses: mymindstorm/setup-emsdk@v14
+
+      - name: WebAssembly build, run under Node
+        run: |
+          emcmake cmake -S . -B .build/wasm
+          cmake --build .build/wasm -j 4
+          node Bindings/web/test.mjs

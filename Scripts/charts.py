@@ -191,13 +191,16 @@ def device_rows(results):
             by_file[row["file"]][row["route"]] = row
     rows = []
     for routes in by_file.values():
-        if "apple" in routes and "fallback" in routes:
+        # Apple's decoder asked for scene-linear output is the like-for-like comparison with
+        # the fallback, which is always scene-linear.
+        apple = routes.get("apple-linear") or routes.get("apple")
+        if apple and "fallback" in routes:
             fallback = routes["fallback"]
             rows.append({
                 "camera": fallback["camera"], "megapixels": fallback["megapixels"],
                 "path": ("Metal" if "Metal" in fallback["decoder"] else "CPU")
                         + (", half size" if fallback["isHalfSize"] else ""),
-                "appleSeconds": routes["apple"]["totalSeconds"], "fallbackSeconds": fallback["totalSeconds"],
+                "appleSeconds": apple["totalSeconds"], "fallbackSeconds": fallback["totalSeconds"],
             })
     return rows
 
