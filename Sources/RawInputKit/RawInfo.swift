@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 import RawShim
 
-/// How the sensor samples colour.
+/// How the sensor samples color.
 public enum RawSensorLayout: String, Sendable, Codable {
     /// No mosaic: linear DNG, merged pixel-shift, reduced-size RAW, monochrome sensors.
     case fullColor
@@ -11,7 +11,7 @@ public enum RawSensorLayout: String, Sendable, Codable {
     case bayer
     /// Fujifilm's 6x6 mosaic.
     case xTrans
-    /// Foveon, four-colour mosaics and anything else.
+    /// Foveon, four-color mosaics and anything else.
     case other
 }
 
@@ -39,7 +39,7 @@ public struct RawInfo: Sendable, Equatable {
     public var shutterSeconds: Double?
     /// The f-number.
     public var aperture: Double?
-    /// In millimetres, as recorded. No 35 mm conversion.
+    /// In millimeters, as recorded. No 35 mm conversion.
     public var focalLength: Double?
 
     /// When the picture was taken, accurate to within a day: LibRaw reads the camera's
@@ -104,8 +104,8 @@ extension RawInfo {
     }
 
     /// Metadata from ImageIO, for files LibRaw cannot parse.
-    init?(imageSourceAt url: URL) {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+    init?(imageSource source: RawSource) {
+        guard let source = source.makeImageSource(),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? Int,
               let height = properties[kCGImagePropertyPixelHeight] as? Int

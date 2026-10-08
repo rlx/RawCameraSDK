@@ -47,13 +47,13 @@ struct ExposureEstimateTests {
 
 @Suite("Preview agreement")
 struct PreviewAgreementTests {
-    /// A flat mid-grey card with a coloured patch.
+    /// A flat mid-gray card with a colored patch.
     private func picture(tint: CIColor? = nil) -> CIImage {
         let frame = CGRect(x: 0, y: 0, width: 240, height: 160)
-        let grey = CIImage(color: CIColor(red: 0.4, green: 0.4, blue: 0.4)).cropped(to: frame)
+        let gray = CIImage(color: CIColor(red: 0.4, green: 0.4, blue: 0.4)).cropped(to: frame)
         let patch = CIImage(color: CIColor(red: 0.7, green: 0.3, blue: 0.2))
             .cropped(to: CGRect(x: 60, y: 40, width: 80, height: 60))
-        let composed = patch.composited(over: grey)
+        let composed = patch.composited(over: gray)
         guard let tint else { return composed }
         return composed.applyingFilter("CIMultiplyCompositing", parameters: [
             kCIInputBackgroundImageKey: CIImage(color: tint).cropped(to: frame),

@@ -20,7 +20,7 @@ enum Probe {
         var fallbackDecoder = ""
         var fallbackError = ""
         var fallbackSeconds = 0.0
-        /// Colour distance from the embedded preview, see `RawImage.previewDistance`. Nil
+        /// Color distance from the embedded preview, see `RawImage.previewDistance`. Nil
         /// when the file has no preview or the route failed.
         var applePreviewDistance: Double?
         var fallbackPreviewDistance: Double?
@@ -54,7 +54,7 @@ enum Probe {
             let raw = try RawInput.open(url, options: options)
             let elapsed = (ContinuousClock.now - start).components
             row.fallbackSeconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18
-            // A decode without error only counts once a centre crop renders pixels.
+            // A decode without error only counts once a center crop renders pixels.
             let extent = raw.image.extent
             let crop = extent.insetBy(dx: extent.width * 0.45, dy: extent.height * 0.45)
             row.fallback = RawMeasurement.renderFully(raw.image.cropped(to: crop), context: context)

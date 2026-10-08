@@ -8,8 +8,9 @@
  *     rik_open / rik_open_buffer   parse container and metadata, no sensor data read
  *       rik_get_info               identification and exposure fields are valid
  *       rik_get_thumbnail          embedded preview, needs no unpack
+ *       rik_storage_mode           how the sensor data is stored, as text
  *     rik_unpack                   decompress the sensor data
- *       rik_get_info               geometry, levels and colour fields are now valid
+ *       rik_get_info               geometry, levels and color fields are now valid
  *       rik_mosaic + rik_get_develop_params
  *                                  the Bayer plane and the inputs for developing it on a GPU
  *       rik_process_rgb16          LibRaw develops on the CPU
@@ -33,13 +34,13 @@ extern "C" {
 
 typedef struct rik_handle rik_handle;
 
-/* How the sensor samples colour, which decides who can develop the file. */
+/* How the sensor samples color, which decides who can develop the file. */
 typedef enum {
-    RIK_CFA_NONE = 0,   /* full colour at every pixel: linear DNG, merged pixel-shift,
+    RIK_CFA_NONE = 0,   /* full color at every pixel: linear DNG, merged pixel-shift,
                            reduced-size RAW, monochrome sensors */
     RIK_CFA_BAYER = 1,  /* 2x2 mosaic of red, green and blue */
     RIK_CFA_XTRANS = 2, /* Fujifilm's 6x6 mosaic */
-    RIK_CFA_OTHER = 3,  /* Foveon, four-colour mosaics (CMYG, RGBE) and anything else */
+    RIK_CFA_OTHER = 3,  /* Foveon, four-color mosaics (CMYG, RGBE) and anything else */
 } rik_cfa_kind;
 
 typedef struct {
@@ -49,14 +50,14 @@ typedef struct {
     char lens[128];
     char decoder[64];   /* LibRaw's decoding routine, e.g. "fuji_compressed_load_raw()" */
     int32_t cfa_kind;   /* rik_cfa_kind */
-    int32_t colors;     /* number of colour channels in the sensor data */
+    int32_t colors;     /* number of color channels in the sensor data */
     uint32_t dng_version; /* 0 unless the container is DNG */
 
     /* ---- Exposure: valid after rik_open ---------------------------------------------- */
     float iso;
     float shutter;      /* seconds */
     float aperture;     /* f-number */
-    float focal_length; /* millimetres */
+    float focal_length; /* millimeters */
     int64_t timestamp;  /* seconds since 1970. LibRaw converts the camera's local time with
                            mktime(), so this assumes the host is in the camera's time zone. */
 
@@ -75,10 +76,10 @@ typedef struct {
      * 5 = 90 degrees counter-clockwise, 6 = 90 degrees clockwise. */
     int32_t flip;
 
-    /* ---- Levels and colour: valid after rik_unpack, Bayer files only -------------------
+    /* ---- Levels and color: valid after rik_unpack, Bayer files only -------------------
      * Arrays of four are indexed by position in the 2x2 mosaic cell, relative to the top-left
      * pixel of the picture rectangle:  index = (row & 1) * 2 + (column & 1). */
-    uint8_t bayer[4];   /* colour at each position: 0 red, 1 green, 2 blue */
+    uint8_t bayer[4];   /* color at each position: 0 red, 1 green, 2 blue */
     float black[4];     /* black level at each position, in raw sample values */
     float white;        /* saturation level, in raw sample values */
     float wb[3];        /* as-shot white balance multipliers for R, G, B; green is 1 */
@@ -104,7 +105,8 @@ typedef struct {
     const uint16_t *pixels; /* interleaved, 16 bits per channel, linear light, not rotated */
     uint32_t width;
     uint32_t height;
-    int32_t channels;       /* 3: RGB with sRGB primaries. 1: monochrome sensor. */
+    int32_t channels;       /* 3: RGB in the primaries set with rik_set_output_primaries.
+                               1: monochrome sensor. */
     size_t row_bytes;
     int32_t is_half_size;   /* 1 if the 2x2-binned result was requested and produced */
 } rik_rgb16;
@@ -123,7 +125,7 @@ typedef struct {
     float matrix_row0[4];    /* rows of the 3x3 matrix, white-balanced camera RGB to */
     float matrix_row1[4];    /* linear sRGB (fourth element of each unused)          */
     float matrix_row2[4];
-    uint32_t pattern[4];     /* colour at each position: 0 red, 1 green, 2 blue */
+    uint32_t pattern[4];     /* color at each position: 0 red, 1 green, 2 blue */
     uint32_t origin[2];      /* picture's top-left corner inside the raw plane: x, y */
     uint32_t size[2];        /* picture size: width, height */
     float white;             /* saturation level, raw sample values */
@@ -157,6 +159,21 @@ void rik_set_cancel_callback(rik_handle *handle, rik_cancel_callback callback, v
 extern const int RIK_CANCELLED;
 extern const int RIK_TOO_BIG;
 
+/* The primaries rik_process_rgb16 converts to. 16-bit unsigned output cannot hold colors
+ * outside its primaries, so sRGB clips part of what a camera records and Rec. 2020 keeps
+ * nearly all of it. The default is sRGB. Call before rik_process_rgb16. */
+typedef enum {
+    RIK_PRIMARIES_SRGB = 0,
+    RIK_PRIMARIES_REC2020 = 1,
+} rik_primaries;
+void rik_set_output_primaries(rik_handle *handle, rik_primaries primaries);
+
+/* Writes a short text naming how the sensor data is stored: the decoding routine, the
+ * container's compression code, bits per sample, and the makers' own quality and
+ * compression fields. Two files from one camera with the same text were recorded in the
+ * same mode. Valid after rik_open. Always NUL-terminated. */
+void rik_storage_mode(rik_handle *handle, char *out, size_t capacity);
+
 /* Fills `info` from the handle's current state. The struct says what is valid when. */
 void rik_get_info(rik_handle *handle, rik_info *info);
 
@@ -174,8 +191,9 @@ const uint16_t *rik_mosaic(rik_handle *handle, size_t *row_bytes);
  * zeroed, unless `rik_info.plain_bayer` is 1. */
 int rik_get_develop_params(rik_handle *handle, rik_develop_params *out);
 
-/* LibRaw's CPU development: demosaic, white balance and colour conversion, with no tone
- * curve, auto-brightness or rotation. Works for every file the core can decode.
+/* LibRaw's CPU development: demosaic, white balance and color conversion, with no tone
+ * curve, auto-brightness or rotation, in the primaries set with rik_set_output_primaries.
+ * Works for every file the core can decode.
  * `half_size` asks for a 2x2-binned result, which LibRaw does for mosaic sensors only.
  * Check `is_half_size`. The first call fixes the result for later calls. */
 int rik_process_rgb16(rik_handle *handle, int half_size, rik_rgb16 *out);

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 202" width="760" height="202" role="img" aria-label="Colour difference between the two decoders' pictures, before and after shared rendering" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 202" width="760" height="202" role="img" aria-label="Color difference between the two decoders' pictures, before and after shared rendering" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13">
 <line x1="232.0" y1="26.0" x2="232.0" y2="158.0" stroke="#e4e3df" stroke-width="1"/>
 <text x="232.0" y="176.0" text-anchor="middle" fill="#52514e" font-weight="400" font-size="12">0</text>
 <line x1="301.7" y1="26.0" x2="301.7" y2="158.0" stroke="#e4e3df" stroke-width="1"/>
@@ -15,7 +15,7 @@
 <text x="650.3" y="176.0" text-anchor="middle" fill="#52514e" font-weight="400" font-size="12">30</text>
 <line x1="720.0" y1="26.0" x2="720.0" y2="158.0" stroke="#e4e3df" stroke-width="1"/>
 <text x="720.0" y="176.0" text-anchor="middle" fill="#52514e" font-weight="400" font-size="12">35</text>
-<text x="476.0" y="194.0" text-anchor="middle" fill="#52514e" font-weight="400" font-size="12">colour difference between the two decoders, ΔE (lower = more alike)</text>
+<text x="476.0" y="194.0" text-anchor="middle" fill="#52514e" font-weight="400" font-size="12">color difference between the two decoders, ΔE (lower = more alike)</text>
 <text x="220.0" y="52.5" text-anchor="end" fill="#0b0b0b" font-weight="400" font-size="13">Each decoder's own output</text>
 <path d="M293.4,46.0 h298.4 a0,0 0 0 1 0,0 v4.0 a0,0 0 0 1 -0,0 h-298.4 z" fill="#b5b4ac" fill-opacity="0.35"/>
 <path d="M332.1,40.0 h94.8 a0,0 0 0 1 0,0 v16.0 a0,0 0 0 1 -0,0 h-94.8 z" fill="#b5b4ac" fill-opacity="0.6"/>

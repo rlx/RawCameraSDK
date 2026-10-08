@@ -4,10 +4,9 @@ import Foundation
 
 /// Runs RawInputKit's blocking calls off the main thread for the views.
 ///
-/// A decode can block for several seconds, so the work runs on its own dispatch queue,
-/// off Swift's cooperative thread pool. Cancellation skips work that has not started and
-/// abandons a fallback decode between stages. Callers discard results they no longer
-/// want, see `DetailModel`.
+/// Decoding uses the library's async `open`, which stops with its task. The other calls
+/// can block too, so they run on a dispatch queue here, off Swift's cooperative thread
+/// pool. Callers discard results they no longer want, see `DetailModel`.
 enum Develop {
     private static let queue = DispatchQueue(label: "RawInputDemo.develop", qos: .userInitiated, attributes: .concurrent)
     private static let context = CIContext()
@@ -19,7 +18,7 @@ enum Develop {
         }
     }
 
-    /// The embedded preview; `nil` if the file has none or the task was cancelled.
+    /// The embedded preview; `nil` if the file has none or the task was canceled.
     static func thumbnail(_ url: URL) async -> CGImage? {
         try? await offload { try RawInput.preview(url, maxPixelSize: 600) }
     }
@@ -29,22 +28,14 @@ enum Develop {
     static func open(
         _ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool
     ) async throws -> (image: RawImage, seconds: Double) {
-        // The dispatch queue cannot see the task's cancellation, so a flag carries it across.
-        let cancelled = Flag()
-        return try await withTaskCancellationHandler {
-            try await offload {
-                var options = RawDecodeOptions()
-                options.routing = routing
-                options.appleRendering = sceneLinear ? .linear : .standard
-                options.isCancelled = { cancelled.isSet }
-                let start = ContinuousClock.now
-                let image = try RawInput.open(url, options: options)
-                let elapsed = (ContinuousClock.now - start).components
-                return (image, Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18)
-            }
-        } onCancel: {
-            cancelled.set()
-        }
+        var options = RawDecodeOptions()
+        options.routing = routing
+        options.appleRendering = sceneLinear ? .linear : .standard
+        let start = ContinuousClock.now
+        // The library's async `open` decodes on its own queue and stops with this task.
+        let image = try await RawInput.open(url, options: options)
+        let elapsed = (ContinuousClock.now - start).components
+        return (image, Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18)
     }
 
     /// Renders for the screen, at most `longEdge` pixels on its longer side. Nothing is
@@ -79,13 +70,4 @@ enum Develop {
 
     /// Physical memory the app is using right now, in megabytes.
     static var memoryFootprintMB: Double { RawMeasurement.memoryFootprint.currentMB }
-}
-
-/// A boolean that can be set from one thread and read from another.
-private final class Flag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = false
-
-    var isSet: Bool { lock.withLock { value } }
-    func set() { lock.withLock { value = true } }
 }

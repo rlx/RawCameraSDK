@@ -4,12 +4,12 @@ import RawShim
 
 /// Develops a Bayer mosaic into scene-linear RGB on the GPU.
 ///
-/// Per output pixel: subtract black, normalise to white, white balance, clip, demosaic
+/// Per output pixel: subtract black, normalize to white, white balance, clip, demosaic
 /// (Hamilton-Adams), then a 3x3 matrix from camera RGB to linear sRGB.
 ///
 /// Coordinates: the mosaic texture holds the whole raw plane, masked borders included. The
 /// kernel works in picture coordinates, with (0, 0) at the top-left of the visible area,
-/// and adds `origin` when it reads the texture. Mosaic positions, the colour pattern and
+/// and adds `origin` when it reads the texture. Mosaic positions, the color pattern and
 /// black levels are indexed in picture coordinates: `(row & 1) * 2 + (column & 1)`.
 ///
 /// Thread-safe: the Metal objects held are immutable after `init`.
@@ -28,7 +28,7 @@ final class MetalDevelop: @unchecked Sendable {
         var matrixRow0: SIMD4<Float>
         var matrixRow1: SIMD4<Float>
         var matrixRow2: SIMD4<Float>
-        /// Colour at each mosaic position: 0 red, 1 green, 2 blue.
+        /// Color at each mosaic position: 0 red, 1 green, 2 blue.
         var pattern: SIMD4<UInt32>
         /// Picture offset inside the raw plane.
         var origin: SIMD2<UInt32>
@@ -73,11 +73,12 @@ final class MetalDevelop: @unchecked Sendable {
     ///   - mosaic: `rawWidth` x `rawHeight` 16-bit samples, rows `rowBytes` apart. Only read
     ///     during the call.
     ///   - halfSize: produce one pixel per 2x2 mosaic cell, with no interpolation.
-    /// - Returns: an image in extended linear sRGB, unrotated, backed by a new texture.
+    /// - Returns: a new texture in extended linear sRGB, unrotated, top row first, and an
+    ///   image backed by it.
     func develop(
         mosaic: UnsafeRawPointer, rowBytes: Int, rawWidth: Int, rawHeight: Int,
         parameters: Parameters, halfSize: Bool
-    ) throws -> CIImage {
+    ) throws -> (image: CIImage, texture: MTLTexture) {
         guard rawWidth <= Self.maximumTextureSide, rawHeight <= Self.maximumTextureSide else {
             throw RawError.renderFailed(reason: "raw plane \(rawWidth)x\(rawHeight) exceeds the texture size limit")
         }
@@ -88,11 +89,17 @@ final class MetalDevelop: @unchecked Sendable {
         let sourceDescriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .r16Uint, width: rawWidth, height: rawHeight, mipmapped: false)
         sourceDescriptor.usage = .shaderRead
-        sourceDescriptor.storageMode = .shared  // CPU-writable for the upload below
+        // CPU-writable for the upload below. A Mac with a discrete GPU has no shared textures.
+        #if os(macOS)
+        sourceDescriptor.storageMode = device.hasUnifiedMemory ? .shared : .managed
+        #else
+        sourceDescriptor.storageMode = .shared
+        #endif
 
         let outputDescriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
-        outputDescriptor.usage = [.shaderRead, .shaderWrite]
+        // A render target too, so a caller given this texture by `makeTexture` can draw into it.
+        outputDescriptor.usage = [.shaderRead, .shaderWrite, .renderTarget]
         outputDescriptor.storageMode = .private  // never read back on the CPU
 
         guard let source = device.makeTexture(descriptor: sourceDescriptor),
@@ -132,7 +139,7 @@ final class MetalDevelop: @unchecked Sendable {
               let image = CIImage(mtlTexture: output, options: [.colorSpace: colorSpace])
         else { throw RawError.renderFailed(reason: "could not wrap the developed texture") }
         // Texture row 0 is the top of the picture and Core Image's origin is bottom-left.
-        return image.oriented(.downMirrored)
+        return (image.oriented(.downMirrored), output)
     }
 
     private static let source = """
@@ -142,7 +149,7 @@ final class MetalDevelop: @unchecked Sendable {
     // Mirrors MetalDevelop.Parameters in Swift, field for field.
     struct Params {
         float4 black;        // per mosaic position: (row & 1) * 2 + (col & 1)
-        float4 wb;           // per colour
+        float4 wb;           // per color
         float4 m0, m1, m2;   // rows: white-balanced camera RGB -> linear sRGB
         uint4 pattern;       // 0 R, 1 G, 2 B
         uint2 origin;        // picture offset inside the raw plane
@@ -159,7 +166,7 @@ final class MetalDevelop: @unchecked Sendable {
     // One sensor sample: black subtracted, scaled so sensor white is 1, white-balanced.
     //
     // Coordinates outside the picture are mirrored about the edge pixel, which keeps the
-    // sample's colour.
+    // sample's color.
     //
     // The clip to 1 comes after white balance. Clipping earlier turns blown highlights magenta.
     static inline float value(Mosaic mosaic, constant Params &params, int2 p) {
@@ -173,7 +180,7 @@ final class MetalDevelop: @unchecked Sendable {
     }
 
     // Green at any pixel. At a red or blue site it is interpolated along the direction with
-    // the smaller gradient, corrected by the curvature of the colour sampled here.
+    // the smaller gradient, corrected by the curvature of the color sampled here.
     static inline float green(Mosaic mosaic, constant Params &params, int2 p) {
         float c = value(mosaic, params, p);
         if (params.pattern[position(p)] == 1) return c;
@@ -210,7 +217,7 @@ final class MetalDevelop: @unchecked Sendable {
         float3 camera = float3(0, g, 0);
 
         if (color == 1) {
-            // Red and blue lie on opposite axes. `2 - colour` swaps red (0) and blue (2).
+            // Red and blue lie on opposite axes. `2 - color` swaps red (0) and blue (2).
             float horizontal = (chroma(mosaic, params, p + int2(-1, 0)) + chroma(mosaic, params, p + int2(1, 0))) * 0.5f;
             float vertical = (chroma(mosaic, params, p + int2(0, -1)) + chroma(mosaic, params, p + int2(0, 1))) * 0.5f;
             uint horizontalColor = params.pattern[position(p + int2(1, 0))];

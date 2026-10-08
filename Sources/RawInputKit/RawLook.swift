@@ -6,7 +6,7 @@ import Foundation
 /// Applied identically whichever decoder produced the data. Baked into a 3D lookup table
 /// and applied with `CIColorCubeWithColorSpace`.
 public struct RawLook: Hashable, Sendable {
-    /// Steepness of the S-curve around middle grey. 0 leaves tones unchanged. 4 to 6 is the
+    /// Steepness of the S-curve around middle gray. 0 leaves tones unchanged. 4 to 6 is the
     /// contrast of a typical in-camera JPEG.
     public var contrast: Double
     /// 1 is unchanged, 0 is monochrome.
@@ -43,13 +43,13 @@ extension RawLook {
     /// Edge length of the lookup table.
     static let cubeSize = 33
 
-    /// Applies the look to one colour. Input and output are sRGB-encoded, 0...1.
+    /// Applies the look to one color. Input and output are sRGB-encoded, 0...1.
     func apply(_ color: SIMD3<Double>) -> SIMD3<Double> {
         var c = color
 
-        // A logistic curve through middle grey, rescaled so black and white stay fixed.
+        // A logistic curve through middle gray, rescaled so black and white stay fixed.
         if contrast > 0 {
-            let pivot = 0.46  // 18% grey, sRGB-encoded
+            let pivot = 0.46  // 18% gray, sRGB-encoded
             func logistic(_ x: Double) -> Double { 1 / (1 + exp(-contrast * (x - pivot))) }
             let low = logistic(0), high = logistic(1)
             for i in 0..<3 { c[i] = (logistic(c[i]) - low) / (high - low) }

@@ -1,6 +1,6 @@
 // Implements RawShim.h, which documents lifecycle, ownership and threading.
 //
-// LibRaw keeps one mutable struct (`imgdata`). unpack() finalises black levels but leaves
+// LibRaw keeps one mutable struct (`imgdata`). unpack() finalizes black levels but leaves
 // the nominal white level. dcraw_process() overwrites width, height and flip. Anything the
 // caller may ask for after processing is captured in rik_unpack.
 
@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <new>
 
@@ -19,6 +20,7 @@ struct rik_handle {
     bool unpacked = false;
     bool data_errors = false;
     bool half_size_applied = false;
+    int output_color = 1;  // LibRaw's code for sRGB primaries
 
     // Captured in rik_unpack.
     int flip = 0;
@@ -55,7 +57,7 @@ int cfa_kind(const libraw_iparams_t &id) {
         return RIK_CFA_XTRANS;
     if (id.filters < 1000)
         return RIK_CFA_OTHER;
-    // Plain Bayer is three colours, or four with the second green listed separately ("RGBG").
+    // Plain Bayer is three colors, or four with the second green listed separately ("RGBG").
     bool rgb = id.colors == 3 || (id.colors == 4 && id.cdesc[3] == 'G');
     return rgb ? RIK_CFA_BAYER : RIK_CFA_OTHER;
 }
@@ -145,10 +147,10 @@ void capture_bayer_state(rik_handle *handle) {
     float highest_black = 0;
     for (int position = 0; position < 4; position++) {
         const int row = position >> 1, col = position & 1;
-        // COLOR() is relative to the picture's top-left pixel. The second green is colour 3.
+        // COLOR() is relative to the picture's top-left pixel. The second green is color 3.
         const int c = raw.COLOR(row, col);
         handle->bayer[position] = (uint8_t)(c == 3 ? 1 : c);
-        // Base, per-colour offset, and an optional pattern of cblack[4] rows by cblack[5] columns.
+        // Base, per-color offset, and an optional pattern of cblack[4] rows by cblack[5] columns.
         float black = (float)color.black + (float)color.cblack[c];
         if (color.cblack[4] > 0 && color.cblack[5] > 0)
             black += (float)color.cblack[6 + (row % color.cblack[4]) * color.cblack[5] + col % color.cblack[5]];
@@ -233,6 +235,26 @@ void rik_set_cancel_callback(rik_handle *handle, rik_cancel_callback callback, v
     handle->cancel_context = context;
 }
 
+void rik_set_output_primaries(rik_handle *handle, rik_primaries primaries) {
+    // LibRaw's `output_color` codes: 1 is sRGB, 8 is Rec. 2020.
+    handle->output_color = primaries == RIK_PRIMARIES_REC2020 ? 8 : 1;
+}
+
+void rik_storage_mode(rik_handle *handle, char *out, size_t capacity) {
+    if (capacity == 0)
+        return;
+    LibRaw &raw = handle->raw;
+    const libraw_data_t &d = raw.imgdata;
+    libraw_decoder_info_t decoder = {};
+    const char *routine = raw.get_decoder_info(&decoder) == LIBRAW_SUCCESS ? decoder.decoder_name : "";
+    const auto &unpacker = raw.get_internal_data_pointer()->unpacker_data;
+    // Fields of other makers are zero for a given file, so they cost nothing to include.
+    std::snprintf(out, capacity, "%s c%u b%u f%d.%d q%d n%u s%u", routine ? routine : "",
+                  unpacker.tiff_compress, d.color.raw_bps, unpacker.fuji_lossless, unpacker.fuji_bits,
+                  (int)d.makernotes.canon.Quality, (unsigned)d.makernotes.nikon.NEFCompression,
+                  (unsigned)d.makernotes.sony.FileFormat);
+}
+
 void rik_get_info(rik_handle *handle, rik_info *info) {
     std::memset(info, 0, sizeof(*info));
     LibRaw &raw = handle->raw;
@@ -276,7 +298,7 @@ void rik_get_info(rik_handle *handle, rik_info *info) {
     info->wb[1] = 1;
     info->wb[2] = mul[2] / green;
 
-    // rgb_cam is 3x4. The fourth column is for four-colour sensors.
+    // rgb_cam is 3x4. The fourth column is for four-color sensors.
     for (int r = 0; r < 3; r++)
         for (int c = 0; c < 3; c++)
             info->rgb_cam[r * 3 + c] = color.rgb_cam[r][c];
@@ -356,7 +378,7 @@ int rik_get_develop_params(rik_handle *handle, rik_develop_params *out) {
         out->white_balance[c] = mul[c] / smallest;
     out->white_balance[3] = 1;
 
-    // rgb_cam is 3x4. The fourth column is for four-colour sensors.
+    // rgb_cam is 3x4. The fourth column is for four-color sensors.
     float *rows[3] = {out->matrix_row0, out->matrix_row1, out->matrix_row2};
     for (int r = 0; r < 3; r++)
         for (int c = 0; c < 3; c++)
@@ -371,14 +393,14 @@ int rik_process_rgb16(rik_handle *handle, int half_size, rik_rgb16 *out) {
     LibRaw &raw = handle->raw;
 
     if (!handle->processed) {
-        // Same contract as the GPU path: scene-linear, white-balanced, sRGB primaries.
+        // Same contract as the GPU path: scene-linear and white-balanced.
         libraw_output_params_t &p = raw.imgdata.params;
         p.output_bps = 16;
         p.gamm[0] = 1;        // linear transfer curve
         p.gamm[1] = 1;
         p.no_auto_bright = 1; // the caller sets exposure
         p.use_camera_wb = 1;
-        p.output_color = 1;   // sRGB primaries
+        p.output_color = handle->output_color;
         p.user_flip = 0;      // the caller applies `flip`
         p.highlight = 0;      // clip highlights
         p.half_size = half_size ? 1 : 0;

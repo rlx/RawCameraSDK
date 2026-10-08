@@ -7,7 +7,8 @@ import Foundation
 ///
 /// Each damaged file is decoded in a child process, and a failing case is kept for
 /// replay. Damage is a few overwritten bytes, mostly in the first 64 KB, and sometimes a
-/// truncation. It is seeded, so a run can be repeated.
+/// truncation. It is seeded, so a run can be repeated. Exits with status 1 if anything
+/// crashed or hung.
 enum Fuzz {
     /// Child-process entry point: every public operation the fallback offers, on one file.
     static func exercise(_ url: URL) {
@@ -17,6 +18,11 @@ enum Fuzz {
         options.routing = .fallback
         if let raw = try? RawInput.open(url, options: options) {
             _ = RawMeasurement.renderFully(raw.rendered(look: .film), context: CIContext())
+        }
+        // The same bytes from memory, which LibRaw reads through a different data stream.
+        if let data = try? Data(contentsOf: url) {
+            _ = try? RawInput.info(data: data)
+            _ = try? RawInput.open(data: data, options: options)
         }
     }
 
@@ -54,6 +60,8 @@ enum Fuzz {
         }
         print("\(iterations) damaged files from \(seeds.count) originals, seed \(seed): "
             + "\(crashes) crashes, \(hangs) hangs")
+        // A finding fails the command, so CI can run it.
+        if crashes + hangs > 0 { exit(1) }
     }
 
     private static func keep(_ file: URL, in folder: URL) throws {

@@ -4,12 +4,23 @@ import Foundation
 /// The Apple route: a thin layer over `CIRAWFilter`.
 enum AppleRawDecoder {
     static func decode(
-        _ url: URL, options: RawDecodeOptions
-    ) throws -> (image: CIImage, decoder: String, exposureEV: Double) {
-        guard let filter = CIRAWFilter(imageURL: url) else { throw RawError.appleCannotDecode }
+        _ source: RawSource, options: RawDecodeOptions
+    ) throws -> (image: CIImage, decoder: String, version: String, exposureEV: Double) {
+        guard let filter = source.makeAppleFilter() else { throw RawError.appleCannotDecode }
 
-        if options.appleDecoderVersion == .newest, let newest = newestVersion(of: filter) {
-            filter.decoderVersion = newest
+        switch options.appleDecoderVersion {
+        case .systemDefault:
+            break
+        case .newest:
+            if let newest = newestVersion(of: filter) { filter.decoderVersion = newest }
+        case .pinned(let requested):
+            // Not assigned blindly: the filter's behavior for a version it does not list is
+            // undocumented, and a silently different rendering defeats the pin.
+            guard let version = filter.supportedDecoderVersions.first(where: { $0.rawValue == requested }) else {
+                throw RawError.appleDecoderVersionUnavailable(
+                    requested: requested, available: filter.supportedDecoderVersions.map(\.rawValue))
+            }
+            filter.decoderVersion = version
         }
         configure(filter, for: options.appleRendering)
         // Keep highlights above reference white.
@@ -18,8 +29,9 @@ enum AppleRawDecoder {
         guard let image = filter.outputImage, !image.extent.isEmpty, !image.extent.isInfinite else {
             throw RawError.appleCannotDecode
         }
-        let exposureEV = options.appleRendering == .linear ? linearExposure(url, version: filter.decoderVersion) : 0
-        return (image, "Apple RAW \(filter.decoderVersion.rawValue)", exposureEV)
+        let version = filter.decoderVersion
+        let exposureEV = options.appleRendering == .linear ? linearExposure(source, version: version) : 0
+        return (image, "Apple RAW \(version.rawValue)", version.rawValue, exposureEV)
     }
 
     private static func configure(_ filter: CIRAWFilter, for rendering: RawDecodeOptions.AppleRendering) {
@@ -31,8 +43,8 @@ enum AppleRawDecoder {
 
     /// Default brightness for Apple's linear output, measured with `ExposureEstimate.measure`
     /// as the fallback's is. Costs a reduced-size decode.
-    private static func linearExposure(_ url: URL, version: CIRAWDecoderVersion) -> Double {
-        guard let filter = CIRAWFilter(imageURL: url) else { return 0 }
+    private static func linearExposure(_ source: RawSource, version: CIRAWDecoderVersion) -> Double {
+        guard let filter = source.makeAppleFilter() else { return 0 }
         filter.decoderVersion = version
         configure(filter, for: .linear)
         filter.extendedDynamicRangeAmount = 1
@@ -46,10 +58,10 @@ enum AppleRawDecoder {
     /// the middle of the frame.
     ///
     /// `CIRAWFilter` can return an image that renders as transparent black for a camera it
-    /// recognises in a compression mode it does not support. The sensor data is decompressed
+    /// recognizes in a compression mode it does not support. The sensor data is decompressed
     /// up to the tested region, so `RawInput.open` caches a "yes" per camera and mode.
-    static func canDecode(_ url: URL) -> Bool {
-        guard let filter = CIRAWFilter(imageURL: url),
+    static func canDecode(_ source: RawSource) -> Bool {
+        guard let filter = source.makeAppleFilter(),
               let image = filter.outputImage, !image.extent.isEmpty, !image.extent.isInfinite
         else { return false }
 

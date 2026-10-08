@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Candidate pool of CC0 RAW samples from raw.pixls.us.
 
-    corpus.py pool                   rebuild Tests/corpus-pool.json from the live catalogue
+    corpus.py pool                   rebuild Tests/corpus-pool.json from the live catalog
     corpus.py fetch                  download and SHA-256 verify the pool into Tests/Corpus (19 GB)
     corpus.py fetch --only A B ...   only files whose name contains one of the given strings
 
@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 POOL = ROOT / "Tests" / "corpus-pool.json"
 CORPUS = ROOT / "Tests" / "Corpus"
-CATALOGUE = "https://raw.pixls.us/json/getrepository.php?set=all"
+CATALOG = "https://raw.pixls.us/json/getrepository.php?set=all"
 MAX_MB = 72
 
 # (make, model regex, mode regex, extension regex, how many of the smallest to keep per model,
@@ -61,8 +61,8 @@ RULES = [
 ]
 
 
-def catalogue():
-    with urllib.request.urlopen(CATALOGUE, timeout=60) as response:
+def catalog():
+    with urllib.request.urlopen(CATALOG, timeout=60) as response:
         rows = json.load(response)["data"]
     link = re.compile(
         r"href='([^']+)'>([^<]+)</a>.*?sha256 Checksum'>([0-9a-f]{64})</span>&nbsp;\(([\d.]+)MB\)"
@@ -84,7 +84,7 @@ def catalogue():
 
 
 def build_pool():
-    entries = [e for e in catalogue() if e["mb"] <= MAX_MB]
+    entries = [e for e in catalog() if e["mb"] <= MAX_MB]
     chosen = {}
     for make, model, mode, ext, keep, *rest in RULES:
         distinct = rest[0] if rest else True

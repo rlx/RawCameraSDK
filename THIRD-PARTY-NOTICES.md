@@ -6,7 +6,7 @@ RawInputKit's fallback decoder is [LibRaw](https://www.libraw.org) 0.22.2,
 Copyright © 2008–2026 LibRaw LLC.
 
 LibRaw is dual-licensed. This project uses it under the Common Development and
-Distribution License, version 1.0 (CDDL-1.0). The licence text is in [`Vendor/LibRaw/LICENSE.CDDL`](Vendor/LibRaw/LICENSE.CDDL).
+Distribution License, version 1.0 (CDDL-1.0). The license text is in [`Vendor/LibRaw/LICENSE.CDDL`](Vendor/LibRaw/LICENSE.CDDL).
 
 - The source is included unmodified as a git submodule at `Vendor/LibRaw`, pinned to the
   `0.22.2` tag of <https://github.com/LibRaw/LibRaw>. No LibRaw file has been changed.

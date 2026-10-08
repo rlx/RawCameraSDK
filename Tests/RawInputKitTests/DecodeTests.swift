@@ -48,7 +48,7 @@ struct SampleTests {
         #expect(distance < RawImage.suspectPreviewDistance)
         #expect(!raw.isColorSuspect)
 
-        let color = centreColor(raw.image)
+        let color = centerColor(raw.image)
         #expect(color.min() >= 0)
         #expect(color.max() > 0.001, "the image is black")
         #expect(color.max() <= 1.001, "the fallback clips highlights at 1")
@@ -76,16 +76,89 @@ struct SampleTests {
             var all: [URL] { lock.withLock { urls } }
         }
         let tested = Log()
-        let support = AppleSupport { url in
-            tested.append(url)
+        let support = AppleSupport { source in
+            if case .file(let url) = source { tested.append(url) }
             return true
         }
         let first = Fixtures.samples[0].url, second = Fixtures.samples[1].url
-        #expect(support.canDecode(first))
-        #expect(support.canDecode(first))
+        #expect(support.canDecode(.file(first)))
+        #expect(support.canDecode(.file(first)))
         #expect(tested.all == [first])
-        #expect(support.canDecode(second))
+        #expect(support.canDecode(.file(second)))
         #expect(tested.all == [first, second])
+    }
+
+    /// The storage mode is part of the kind, so two compression modes of one camera are
+    /// tested separately.
+    @Test(arguments: Fixtures.samples)
+    func storageModeNamesTheDecodingRoutine(_ sample: Fixtures.Sample) throws {
+        let file = try LibRawFile(sample.url)
+        let routine = try #require(RawInfo(file.info).decoderRoutine)
+        #expect(file.storageMode.hasPrefix(routine))
+        #expect(file.storageMode.count > routine.count, "compression and bit depth follow the routine")
+    }
+
+    /// PhotoKit hands over bytes, not a file.
+    @Test(arguments: Fixtures.samples)
+    func opensFromMemoryAsFromDisk(_ sample: Fixtures.Sample) throws {
+        let data = try Data(contentsOf: sample.url)
+        let fromDisk = try RawInput.open(sample.url), fromMemory = try RawInput.open(data: data)
+        #expect(fromMemory.route == .fallback && fromMemory.fallbackPath == fromDisk.fallbackPath)
+        #expect(fromMemory.info == fromDisk.info)
+        #expect(fromMemory.image.extent == fromDisk.image.extent)
+        #expect(simd_distance(centerColor(fromMemory.image), centerColor(fromDisk.image)) < 0.001)
+        #expect(try RawInput.info(data: data) == RawInput.info(sample.url))
+        #expect(try RawInput.preview(data: data, maxPixelSize: 256).width
+            == RawInput.preview(sample.url, maxPixelSize: 256).width)
+        #expect(!RawInput.appleCanDecode(data: data))
+    }
+
+    @Test func emptyDataSaysSo() {
+        #expect(throws: RawError.emptyData) { try RawInput.open(data: Data()) }
+        #expect(throws: RawError.emptyData) { try RawInput.info(data: Data()) }
+    }
+
+    /// The CPU path converts to Rec. 2020 so that 16-bit integers can hold colors outside
+    /// sRGB. Colors inside sRGB must come out the same either way.
+    @Test func wideGamutOutputKeepsInGamutColor() throws {
+        let sample = try #require(Fixtures.samples.first { $0.file.hasSuffix(".raf") })
+        func average(wideGamut: Bool) throws -> SIMD3<Double> {
+            let file = try LibRawFile(sample.url)
+            if wideGamut { file.useWideGamutOutput() }
+            try file.unpack()
+            return try file.withDeveloped(halfSize: true) { developed in
+                let pixels = try #require(developed.pixels)
+                var sum = SIMD3<Double>.zero
+                let count = Int(developed.width) * Int(developed.height)
+                for pixel in 0..<count {
+                    sum += SIMD3(Double(pixels[pixel * 3]), Double(pixels[pixel * 3 + 1]), Double(pixels[pixel * 3 + 2]))
+                }
+                return sum / Double(count) / 65535
+            }
+        }
+        let srgb = try average(wideGamut: false), rec2020 = try average(wideGamut: true)
+        // Linear Rec. 2020 to linear sRGB (ITU-R BT.2087).
+        let converted = SIMD3(
+            1.6605 * rec2020.x - 0.5876 * rec2020.y - 0.0728 * rec2020.z,
+            -0.1246 * rec2020.x + 1.1329 * rec2020.y - 0.0083 * rec2020.z,
+            -0.0182 * rec2020.x - 0.1006 * rec2020.y + 1.1187 * rec2020.z)
+        #expect(simd_distance(srgb, rec2020) > 0.002, "the two outputs are in different primaries")
+        #expect(simd_distance(srgb, converted) < 0.004)
+    }
+
+    /// A canceled task stops the decode and gets no image.
+    @Test func cancelingTheTaskCancelsTheDecode() async throws {
+        let file = try #require(Fixtures.samples.first).url
+        let task = Task { try await RawInput.open(file) }
+        task.cancel()
+        await #expect(throws: RawError.cancelled) { try await task.value }
+    }
+
+    @Test func asyncOpenMatchesTheBlockingOne() async throws {
+        let file = try #require(Fixtures.samples.first).url
+        let blocking = try { try RawInput.open(file) }()
+        let awaited = try await RawInput.open(data: Data(contentsOf: file))
+        #expect(awaited.info == blocking.info && awaited.image.extent == blocking.image.extent)
     }
 
     /// A "no" may come from one damaged file, so it is never cached.
@@ -98,8 +171,8 @@ struct SampleTests {
         }
         let answers = Answers()
         let support = AppleSupport { _ in answers.next() }
-        #expect(!support.canDecode(file))
-        #expect(support.canDecode(file), "the second file of the same kind is tested on its own")
+        #expect(!support.canDecode(.file(file)))
+        #expect(support.canDecode(.file(file)), "the second file of the same kind is tested on its own")
     }
 
     @Test func reportsEventsForAFallbackDecode() throws {
@@ -166,8 +239,8 @@ struct SampleTests {
         let failures = await withTaskGroup(of: Bool.self) { group in
             for url in urls + urls {
                 group.addTask {
-                    guard let raw = try? RawInput.open(url) else { return true }
-                    return centreColor(raw.image).max() <= 0.001 || (try? RawInput.preview(url)) == nil
+                    guard let raw = try? await RawInput.open(url) else { return true }
+                    return centerColor(raw.image).max() <= 0.001 || (try? RawInput.preview(url)) == nil
                 }
             }
             return await group.reduce(0) { $0 + ($1 ? 1 : 0) }
@@ -177,7 +250,7 @@ struct SampleTests {
 }
 
 /// The two decoders on a file both can open. Apple applies a tone curve and the fallback
-/// does not, so only size and colour are compared.
+/// does not, so only size and color are compared.
 @Suite("Decoder agreement", .enabled(if: Fixtures.reference != nil, Fixtures.fetchHint))
 struct AgreementTests {
     let url = Fixtures.reference!
@@ -203,8 +276,8 @@ struct AgreementTests {
 
     /// Compares chromaticity because the tone curves differ.
     @Test func routesAgreeOnColor() throws {
-        let apple = chromaticity(centreColor(try open(url, .apple).image))
-        let fallback = chromaticity(centreColor(try open(url, .fallback).image))
+        let apple = chromaticity(centerColor(try open(url, .apple).image))
+        let fallback = chromaticity(centerColor(try open(url, .fallback).image))
         #expect(simd_distance(apple, fallback) < 0.05)
     }
 
@@ -213,14 +286,14 @@ struct AgreementTests {
         #expect(half.isHalfSize && !full.isHalfSize)
         #expect(abs(half.image.extent.width * 2 - full.image.extent.width) <= 2)
         #expect(half.info == full.info, "info describes the full-resolution frame either way")
-        #expect(simd_distance(chromaticity(centreColor(full.image)), chromaticity(centreColor(half.image))) < 0.01)
+        #expect(simd_distance(chromaticity(centerColor(full.image)), chromaticity(centerColor(half.image))) < 0.01)
     }
 
     @Test func suggestedExposureBrightensWithoutClippingMuch() throws {
         let raw = try open(url, .fallback)
         #expect(raw.suggestedExposureEV >= 0 && raw.suggestedExposureEV <= 4)
-        let shown = centreColor(raw.displayImage())
-        #expect(shown.max() >= centreColor(raw.image).max())
+        let shown = centerColor(raw.displayImage())
+        #expect(shown.max() >= centerColor(raw.image).max())
         #expect(shown.max() <= 1)
     }
 
@@ -228,7 +301,7 @@ struct AgreementTests {
         // Apple's image can carry highlights above 1.
         for routing in [RawDecodeOptions.Routing.apple, .fallback] {
             let display = try open(url, routing).displayImage(exposureEV: 6)
-            #expect(centreColor(display).max() <= 1.001)
+            #expect(centerColor(display).max() <= 1.001)
         }
     }
 
@@ -244,11 +317,58 @@ struct AgreementTests {
         #expect(!appleOwn.isSceneLinear && appleLinear.isSceneLinear && fallback.isSceneLinear)
         #expect(appleLinear.suggestedExposureEV > 0, "Apple's linear output is measured, like the fallback's")
 
-        let own = simd_distance(centreColor(appleOwn.displayImage()), centreColor(fallback.displayImage()))
+        let own = simd_distance(centerColor(appleOwn.displayImage()), centerColor(fallback.displayImage()))
         let shared = simd_distance(
-            centreColor(appleLinear.rendered(look: .film)), centreColor(fallback.rendered(look: .film)))
+            centerColor(appleLinear.rendered(look: .film)), centerColor(fallback.rendered(look: .film)))
         #expect(shared < own, "closer after the shared step than before it")
         #expect(shared < 0.03)
+    }
+
+    /// An edit stores the version it was made with and asks for it again.
+    @Test func appleDecoderVersionCanBePinned() throws {
+        let first = try open(url, .apple)
+        let version = try #require(first.appleDecoderVersion)
+        #expect(first.decoder == "Apple RAW \(version)")
+        #expect(try open(url, .fallback).appleDecoderVersion == nil)
+
+        var options = RawDecodeOptions()
+        options.routing = .apple
+        options.appleDecoderVersion = .pinned(version)
+        #expect(try RawInput.open(url, options: options).appleDecoderVersion == version)
+
+        options.appleDecoderVersion = .pinned("no such version")
+        #expect {
+            try RawInput.open(url, options: options)
+        } throws: { error in
+            guard case RawError.appleDecoderVersionUnavailable(let requested, let available) = error else { return false }
+            return requested == "no such version" && available.contains(version)
+        }
+    }
+
+    @Test func appleRouteOpensFromMemory() throws {
+        let data = try Data(contentsOf: url)
+        #expect(RawInput.appleCanDecode(data: data))
+        let fromMemory = try RawInput.open(data: data), fromDisk = try open(url, .automatic)
+        #expect(fromMemory.route == .apple)
+        #expect(fromMemory.info == fromDisk.info && fromMemory.image.extent == fromDisk.image.extent)
+        #expect(simd_distance(centerColor(fromMemory.image), centerColor(fromDisk.image)) < 0.001)
+    }
+
+    @Test func testingEveryFileStillPrefersApple() throws {
+        var options = RawDecodeOptions()
+        options.appleSupportCheck = .everyFile
+        #expect(try RawInput.open(url, options: options).route == .apple)
+    }
+
+    /// The GPU path's own texture is handed over when nothing has to change.
+    @Test func textureFromTheGPUPathIsNotCopied() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let raw = try open(url, .fallback)
+        try #require(raw.fallbackPath == .gpu && raw.info.orientation == .up)
+        let first = try raw.makeTexture(device: device), second = try raw.makeTexture(device: device)
+        #expect(first === second)
+        let wide = try raw.makeTexture(device: device, colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3))
+        #expect(wide !== first && wide.width == first.width && wide.height == first.height)
     }
 
     @Test(arguments: [RawDecodeOptions.Routing.apple, .fallback])
@@ -266,8 +386,8 @@ struct AgreementTests {
             .colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
         ])).oriented(.downMirrored)
         let corner = CGRect(x: 0, y: raw.image.extent.height - 64, width: 64, height: 64)
-        let expected = centreColor(raw.image.cropped(to: corner))
-        let actual = centreColor(fromTexture.cropped(to: corner))
+        let expected = centerColor(raw.image.cropped(to: corner))
+        let actual = centerColor(fromTexture.cropped(to: corner))
         #expect(simd_distance(expected, actual) < 0.01)
     }
 

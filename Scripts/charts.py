@@ -6,7 +6,7 @@
     Tests/device-results.json  written by `Scripts/device-bench.py`    -> speed-device
     Tests/match-results.json   written by `rawprobe match ... --json`  -> route-match
 
-Plain SVG, no dependencies. Colours come from a colour-blind-validated palette and match
+Plain SVG, no dependencies. Colors come from a color-blind-validated palette and match
 the two decoders in the demo app.
 """
 import json
@@ -121,7 +121,7 @@ def coverage(rows, pool):
 
 
 def agreement(rows):
-    """How far each decoder's colour sits from the camera's own preview, on files both open."""
+    """How far each decoder's color sits from the camera's own preview, on files both open."""
     shared = [r for r in rows if r["apple"] and r["fallback"]
               and r.get("applePreviewDistance") is not None and r.get("fallbackPreviewDistance") is not None]
     series = [("apple", "Apple's decoder", [r["applePreviewDistance"] for r in shared]),
@@ -132,14 +132,14 @@ def agreement(rows):
     scale = (width - left - right) / limit
 
     for mode, theme in THEMES.items():
-        svg = Svg(width, height, theme, "Colour distance from the camera's embedded preview, per decoder")
+        svg = Svg(width, height, theme, "Color distance from the camera's embedded preview, per decoder")
         bottom = top + row_height * len(series)
         for tick in (0, 0.05, 0.10, 0.15, 0.20):
             x = left + tick * scale
             svg.line(x, top, x, bottom)
             svg.text(x, bottom + 18, f"{tick:.2f}", anchor="middle", color="muted", size=12)
         svg.text(left + limit * scale / 2, bottom + 36,
-                 "chromaticity distance from the embedded preview (0 = identical colour)",
+                 "chromaticity distance from the embedded preview (0 = identical color)",
                  anchor="middle", color="muted", size=12)
         range_rows(svg, series, left, top, row_height, scale, "median {:.3f}")
         svg.save("preview-agreement", mode)
@@ -168,14 +168,14 @@ def route_match(rows):
     width, height = 760, top + row_height * len(series) + 44
     scale = (width - left - right) / limit
     for mode, theme in THEMES.items():
-        svg = Svg(width, height, theme, "Colour difference between the two decoders' pictures, before and after shared rendering")
+        svg = Svg(width, height, theme, "Color difference between the two decoders' pictures, before and after shared rendering")
         bottom = top + row_height * len(series)
         for tick in range(0, limit + 1, 5):
             x = left + tick * scale
             svg.line(x, top, x, bottom)
             svg.text(x, bottom + 18, tick, anchor="middle", color="muted", size=12)
         svg.text(left + limit * scale / 2, bottom + 36,
-                 "colour difference between the two decoders, ΔE (lower = more alike)",
+                 "color difference between the two decoders, ΔE (lower = more alike)",
                  anchor="middle", color="muted", size=12)
         range_rows(svg, series, left, top, row_height, scale, "median {:.1f}")
         svg.save("route-match", mode)

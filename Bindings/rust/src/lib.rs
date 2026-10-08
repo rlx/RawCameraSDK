@@ -64,16 +64,16 @@ fn check(code: i32) -> Result<(), Error> {
     Err(Error::Decode { code, reason })
 }
 
-/// How the sensor samples colour.
+/// How the sensor samples color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SensorLayout {
-    /// Full colour at every pixel: linear DNG, merged pixel-shift, monochrome sensors.
+    /// Full color at every pixel: linear DNG, merged pixel-shift, monochrome sensors.
     FullColor,
     /// The usual 2x2 mosaic of red, green and blue.
     Bayer,
     /// Fujifilm's 6x6 mosaic.
     XTrans,
-    /// Foveon, four-colour mosaics and anything else.
+    /// Foveon, four-color mosaics and anything else.
     Other,
 }
 

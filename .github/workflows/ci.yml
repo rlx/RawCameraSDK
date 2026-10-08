@@ -39,6 +39,23 @@ jobs:
       - name: Test
         run: swift test
 
+      # Damaged copies of the sample files, each decoded in a child process, under
+      # AddressSanitizer. A crash or a hang fails the step. The seed changes with every run,
+      # and a failing case is kept as an artifact so it can be replayed.
+      - name: Fuzz the fallback
+        run: |
+          swift build -c release --sanitize=address --scratch-path .build/asan
+          .build/asan/release/rawprobe fuzz Examples/RawInputDemo/Samples/files/* \
+            --iterations 60 --seed ${{ github.run_number }}
+
+      - name: Keep fuzz findings
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-findings
+          path: fuzz-findings/
+          if-no-files-found: ignore
+
       - name: Build the demo app for iOS
         run: |
           xcodebuild build \

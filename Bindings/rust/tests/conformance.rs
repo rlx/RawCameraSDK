@@ -169,7 +169,7 @@ fn develops_a_real_file_through_wgpu() {
     assert_eq!((texture.width(), texture.height()), (params.size[0] / 2, params.size[1] / 2));
 
     let developed = read_back(&device, &queue, &texture);
-    let centre = developed[developed.len() / 2][developed[0].len() / 2];
-    assert!(centre.iter().all(|v| v.is_finite() && *v >= 0.0), "{centre:?}");
-    assert!(centre.iter().any(|v| *v > 0.001), "the picture is black");
+    let center = developed[developed.len() / 2][developed[0].len() / 2];
+    assert!(center.iter().all(|v| v.is_finite() && *v >= 0.0), "{center:?}");
+    assert!(center.iter().any(|v| *v > 0.001), "the picture is black");
 }

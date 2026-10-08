@@ -3,12 +3,18 @@
 The decoder is a portable core with a C interface. The Swift package, a Rust crate and a
 WebAssembly module all build from it.
 
+The Rust and WebAssembly bindings are experiments. They show that the core and the kernel
+carry to other hosts and they are tested in CI, but they stop at decoding and developing.
+They have no looks, color check or cancellation, and their CPU output uses the core's
+default sRGB primaries, which clip wider colors. The Swift library asks for Rec. 2020
+with `rik_set_output_primaries`, and a binding that needs the full gamut would do the same.
+
 ## Layers
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │ Bindings                                                                      │
-│   Swift package   Apple's decoder first, Metal kernel, looks, colour check    │
+│   Swift package   Apple's decoder first, Metal kernel, looks, color check    │
 │   Rust crate      safe wrapper, WGSL kernel through wgpu                      │
 │   Web module      WebAssembly build, JavaScript wrapper                       │
 ├───────────────────────────────────────────────────────────────────────────────┤
@@ -41,7 +47,7 @@ tests run them on the WGSL kernel. `Scripts/conformance.py` generates the file.
 
 `Sources/RawShim/include/RawShim.h` is the full interface.
 
-- `rik_abi_version()` changes with any struct layout or behaviour change. The Rust and
+- `rik_abi_version()` changes with any struct layout or behavior change. The Rust and
   JavaScript wrappers check it at start-up.
 - Every pointer belongs to the handle and is valid until `rik_close`.
 
@@ -109,7 +115,7 @@ The tests run under Node. Nothing here has been run in a browser.
 
 - Apple's decoder, which exists only on Apple platforms. The core is the only decoder
   elsewhere.
-- Looks, the colour check and automatic exposure. They are written against Core Image.
+- Looks, the color check and automatic exposure. They are written against Core Image.
 - Cancellation. `rik_set_cancel_callback` is in the C interface but the wrappers do not
   expose it.
 

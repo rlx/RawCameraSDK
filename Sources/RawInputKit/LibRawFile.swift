@@ -10,22 +10,50 @@ import RawShim
 final class LibRawFile {
     private let handle: OpaquePointer
     private var cancellation: Cancellation?
+    /// The bytes LibRaw reads from when the file was opened from memory. LibRaw does not
+    /// copy them, so they are kept here until the handle closes.
+    private let bytes: NSData?
 
     /// Parses the container and metadata. No sensor data is read.
-    init(_ url: URL) throws {
+    init(_ source: RawSource) throws {
         var handle: OpaquePointer?
-        let code = url.withUnsafeFileSystemRepresentation { rik_open($0, &handle) }
+        let code: Int32
+        switch source {
+        case .file(let url):
+            bytes = nil
+            code = url.withUnsafeFileSystemRepresentation { rik_open($0, &handle) }
+        case .data(let data, _):
+            // An NSData's `bytes` pointer is stable for as long as the object lives.
+            let held = data as NSData
+            bytes = held
+            code = rik_open_buffer(held.bytes, held.length, &handle)
+        }
         guard code == 0, let handle else { throw Self.error(code) }
         self.handle = handle
     }
 
+    convenience init(_ url: URL) throws { try self.init(.file(url)) }
+
     deinit { rik_close(handle) }
 
-    /// Geometry, levels and colour fields are only meaningful after `unpack()`.
+    /// Geometry, levels and color fields are only meaningful after `unpack()`.
     var info: rik_info {
         var info = rik_info()
         rik_get_info(handle, &info)
         return info
+    }
+
+    /// How the sensor data is stored, as text: decoding routine, compression and bit depth.
+    var storageMode: String {
+        var text = [CChar](repeating: 0, count: 160)
+        rik_storage_mode(handle, &text, text.count)
+        return String(decoding: text.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self)
+    }
+
+    /// Has `withDeveloped` convert to Rec. 2020 primaries, which keep colors that sRGB
+    /// primaries clip. Call before `withDeveloped`.
+    func useWideGamutOutput() {
+        rik_set_output_primaries(handle, RIK_PRIMARIES_REC2020)
     }
 
     /// Refuses files whose sensor data would need more than this to decode. Call before `unpack`.
@@ -65,7 +93,8 @@ final class LibRawFile {
         }
     }
 
-    /// LibRaw's CPU development: linear 16-bit RGB or grey, unrotated.
+    /// LibRaw's CPU development: linear 16-bit RGB or gray, unrotated. sRGB primaries unless
+    /// `useWideGamutOutput` was called.
     func withDeveloped<Result>(halfSize: Bool, _ body: (rik_rgb16) throws -> Result) throws -> Result {
         try withExtendedLifetime(self) {
             var image = rik_rgb16()

@@ -25,7 +25,7 @@ def brand(make):
     return _CANONICAL.setdefault(key, make.title() if make.isupper() or make.islower() else make)
 
 
-# Names whose capitalisation title-casing would get wrong.
+# Names whose capitalization title-casing would get wrong.
 _CANONICAL = {
     "gopro": "GoPro", "dji": "DJI", "lg": "LG", "sjcam": "SJCAM", "gitup": "GitUp", "kandao": "KanDao",
     "htc": "HTC", "asus": "ASUS", "bq": "BQ", "madv": "MADV", "hmd global": "HMD Global",

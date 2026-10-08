@@ -21,7 +21,7 @@ struct KernelTests {
         var rawWidth: Int { width + 5 }
         var rawHeight: Int { height + 3 }
 
-        /// `color(x, y)` is the scene colour at a picture coordinate, 0...1 per channel.
+        /// `color(x, y)` is the scene color at a picture coordinate, 0...1 per channel.
         init(
             width: Int = 8, height: Int = 8, pattern: SIMD4<UInt32>,
             blackLevels: SIMD4<Float> = SIMD4(repeating: Mosaic.black), color: (Int, Int) -> SIMD3<Float>
@@ -54,7 +54,7 @@ struct KernelTests {
             let image = try samples.withUnsafeBytes { bytes in
                 try #require(MetalDevelop.shared).develop(
                     mosaic: bytes.baseAddress!, rowBytes: rawWidth * 2, rawWidth: rawWidth, rawHeight: rawHeight,
-                    parameters: parameters, halfSize: halfSize)
+                    parameters: parameters, halfSize: halfSize).image
             }
             return pixels(of: image)
         }
@@ -146,7 +146,7 @@ struct KernelTests {
         let image = try test.mosaic.withUnsafeBytes { bytes in
             try #require(MetalDevelop.shared).develop(
                 mosaic: bytes.baseAddress!, rowBytes: test.rawWidth * 2, rawWidth: test.rawWidth,
-                rawHeight: test.rawHeight, parameters: parameters, halfSize: test.halfSize)
+                rawHeight: test.rawHeight, parameters: parameters, halfSize: test.halfSize).image
         }
         let developed = pixels(of: image)
         let tolerance = ConformanceCase.tolerance

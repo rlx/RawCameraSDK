@@ -58,7 +58,7 @@ struct ExposureEstimate {
 
         var estimate = ExposureEstimate()
         for pixel in stride(from: 0, to: pixels.count, by: 4) {
-            // The brightest channel, so that a saturated colour counts as bright.
+            // The brightest channel, so that a saturated color counts as bright.
             estimate.add(max(pixels[pixel], pixels[pixel + 1], pixels[pixel + 2]))
         }
         return estimate.suggestedEV

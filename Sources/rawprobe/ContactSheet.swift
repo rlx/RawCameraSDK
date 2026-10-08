@@ -9,8 +9,8 @@ enum ContactSheet {
         enum Framing {
             /// Scaled to the cell's width.
             case whole
-            /// The centre at one image pixel per sheet pixel.
-            case centreCrop
+            /// The center at one image pixel per sheet pixel.
+            case centerCrop
         }
 
         var caption: String?
@@ -22,7 +22,7 @@ enum ContactSheet {
     private static let captionHeight: CGFloat = 30
 
     /// - Parameter cellSize: every cell is this wide; `whole` cells take their height from
-    ///   the first cell's aspect ratio, `centreCrop` cells use `cellSize.height`.
+    ///   the first cell's aspect ratio, `centerCrop` cells use `cellSize.height`.
     static func write(rows: [[Cell]], cellSize: CGSize, to output: URL) throws {
         guard let first = rows.first?.first else { return }
         let wholeHeight = (cellSize.width * first.image.extent.height / first.image.extent.width).rounded()

@@ -5,15 +5,15 @@ import ImageIO
 
 /// Extracts the preview a camera embeds in its RAW files.
 enum RawPreview {
-    static func make(_ url: URL, maxPixelSize: Int) throws -> CGImage {
+    static func make(_ source: RawSource, maxPixelSize: Int) throws -> CGImage {
         // LibRaw first: it picks the largest preview. ImageIO can also develop one from the
         // sensor data for files that embed none.
-        if let file = try? LibRawFile(url), let image = try? embedded(in: file, maxPixelSize: maxPixelSize) {
+        if let file = try? LibRawFile(source), let image = try? embedded(in: file, maxPixelSize: maxPixelSize) {
             return image
         }
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+        guard let imageSource = source.makeImageSource(),
               let image = CGImageSourceCreateThumbnailAtIndex(
-                source, 0, thumbnailOptions(maxPixelSize, alwaysFromImage: false) as CFDictionary)
+                imageSource, 0, thumbnailOptions(maxPixelSize, alwaysFromImage: false) as CFDictionary)
         else { throw RawError.noPreview }
         return image
     }

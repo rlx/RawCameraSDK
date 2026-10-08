@@ -116,7 +116,7 @@ struct DetailView: View {
                 Text(metadata(raw.info)).font(.caption).foregroundStyle(.secondary)
                 if raw.isColorSuspect {
                     // The fallback's result disagrees with the embedded preview. See RawImage.isColorSuspect.
-                    Label("Colours may be off: they differ from the camera's own preview.", systemImage: "exclamationmark.triangle.fill")
+                    Label("Colors may be off: they differ from the camera's own preview.", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -139,7 +139,7 @@ struct DetailView: View {
         let size = "\(Int(raw.image.extent.width)) x \(Int(raw.image.extent.height))"
         let time = model.openSeconds.formatted(.number.precision(.fractionLength(2)))
         let half = raw.isHalfSize ? " (half size)" : ""
-        // Labelled "open": Apple's decoder defers its work to render time, so the figure is
+        // Labeled "open": Apple's decoder defers its work to render time, so the figure is
         // only comparable between fallback paths.
         return "\(size)\(half) · open \(time) s · \(Int(model.memoryMB)) MB"
     }

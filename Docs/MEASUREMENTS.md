@@ -83,15 +83,15 @@ reduction and some lens corrections, such as the vignetting at the left of the F
 frame. The fallback's image is scene-linear with none of those, so it looks flatter and
 slightly softer.
 
-### Colour against the embedded preview
+### Color against the embedded preview
 
-Most RAW files carry a preview rendered by the camera, which serves as a colour reference.
+Most RAW files carry a preview rendered by the camera, which serves as a color reference.
 The chart shows each decoder's distance from it, ignoring brightness, for the 744 files
 that both decoders open and that have a preview.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="preview-agreement-dark.svg">
-  <img src="preview-agreement-light.svg" alt="Distribution of colour distance from the embedded preview: Apple's decoder median 0.027, fallback median 0.044">
+  <img src="preview-agreement-light.svg" alt="Distribution of color distance from the embedded preview: Apple's decoder median 0.027, fallback median 0.044">
 </picture>
 
 The thick bar spans the middle half of files, the thin bar the middle 90%, and the dot is
@@ -109,30 +109,30 @@ The library runs this check on every fallback decode (`RawImage.previewDistance`
 
 ## Matching the two decoders
 
-Colour difference between the two decoders' pictures, on 202 files that both open (every
+Color difference between the two decoders' pictures, on 202 files that both open (every
 fourth one):
 
 | Compared | Median ΔE |
 |---|---|
-| Each decoder's default output | 10.7 |
+| Each decoder's default output | 10.8 |
 | Both scene-linear, exposure measured the same way, no look | 2.9 |
-| Both through the shared neutral look | 3.2 |
+| Both through the shared neutral look | 3.3 |
 | Both through the shared film look | 2.9 |
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="route-match-dark.svg">
-  <img src="route-match-light.svg" alt="Colour difference between the two decoders, before and after shared rendering">
+  <img src="route-match-light.svg" alt="Color difference between the two decoders, before and after shared rendering">
 </picture>
 
 ΔE is CIELAB (1976) between area averages on a 24 by 16 grid. A difference of about 1 is
-just visible side by side, and above 10 is obvious. The measure covers colour and tone
+just visible side by side, and above 10 is obvious. The measure covers color and tone
 and does not see sharpness, noise or local distortion.
 
 The first row compares a picture with a tone curve to one without. In the second row
 Apple's decoder returns linear data and exposure is measured the same way for both. That
-brings the median to about 3, and 194 of 202 files end up closer than with the defaults.
+brings the median to about 3, and 195 of 202 files end up closer than with the defaults.
 Applying a look afterwards does not change the difference much. A ΔE of 3 is still visible
-when flipping between the two pictures. The remainder comes from different colour
+when flipping between the two pictures. The remainder comes from different color
 matrices and from Apple's lens corrections and noise reduction.
 
 ![Canon EOS R3 through both decoders: their own output, then a shared neutral look, then a shared film look](looks-canon-eos-r3.jpg)
@@ -151,7 +151,7 @@ measurement is a separate process.
 - Both exclude the library's check of whether Apple can open the file. The Mac table shows
   that separately.
 
-### iPhone 16 Pro Max (one launch per figure)
+### iPhone 16 Pro Max (median of three launches)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="speed-device-dark.svg">
@@ -160,13 +160,13 @@ measurement is a separate process.
 
 | File | Fallback path | Apple | Apple, linear | Fallback | Apple linear, next file | Fallback, next file | Apple linear peak | Fallback peak |
 |---|---|---|---|---|---|---|---|---|
-| Sony a9 III, 10 MP crop mode | GPU | 0.45 s | 0.53 s | 0.18 s | 0.36 s | 0.12 s | 742 MB | 315 MB |
-| Canon EOS R3, 24 MP | GPU | 1.45 s | 1.78 s | 0.41 s | 1.11 s | 0.34 s | 912 MB | 524 MB |
-| Nikon Z f, 24 MP | GPU | 0.60 s | 0.80 s | 0.50 s | 0.61 s | 0.44 s | 867 MB | 529 MB |
-| Panasonic S1R II, 44 MP | GPU | 6.36 s | 7.03 s | 0.74 s | 1.74 s | 0.73 s | 681 MB | 810 MB |
-| Sony a1, 50 MP | GPU | 1.13 s | 1.58 s | 0.58 s | 1.33 s | 0.54 s | 744 MB | 910 MB |
-| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 1.09 s | 1.56 s | 9.02 s | 1.38 s | 9.07 s | 721 MB | 1,267 MB |
-| Fujifilm GFX100 II, 102 MP | GPU, half size | 2.21 s | 3.40 s | 3.08 s | 4.86 s | 2.97 s | 1,311 MB | 811 MB |
+| Sony a9 III, 10 MP crop mode | GPU | 0.43 s | 0.54 s | 0.19 s | 0.36 s | 0.12 s | 493 MB | 315 MB |
+| Canon EOS R3, 24 MP | GPU | 0.88 s | 1.19 s | 0.41 s | 1.03 s | 0.33 s | 913 MB | 524 MB |
+| Nikon Z f, 24 MP | GPU | 0.57 s | 0.72 s | 0.49 s | 0.54 s | 0.44 s | 542 MB | 530 MB |
+| Panasonic S1R II, 44 MP | GPU | 6.33 s | 7.01 s | 0.71 s | 1.71 s | 0.65 s | 684 MB | 810 MB |
+| Sony a1, 50 MP | GPU | 1.07 s | 1.50 s | 0.59 s | 1.33 s | 0.50 s | 828 MB | 910 MB |
+| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 1.05 s | 1.56 s | 8.98 s | 1.39 s | 8.87 s | 721 MB | 1,271 MB |
+| Fujifilm GFX100 II, 102 MP | GPU, half size | 2.17 s | 3.84 s | 2.92 s | 3.83 s | 2.89 s | 1,270 MB | 810 MB |
 
 "Next file" is the same decode repeated in the same process.
 
@@ -179,13 +179,13 @@ measurement is a separate process.
 
 | File | Fallback path | Apple | Apple, linear | Apple via `RawInput.open` | Fallback | Apple peak | Fallback peak |
 |---|---|---|---|---|---|---|---|
-| Sony a9 III, 10 MP crop mode | GPU | 0.38 s | 0.52 s | 0.48 s | 0.14 s | 1,279 MB | 375 MB |
-| Canon EOS R3, 24 MP | GPU | 0.60 s | 0.91 s | 0.87 s | 0.40 s | 2,149 MB | 689 MB |
-| Nikon Z f, 24 MP | GPU | 0.44 s | 0.58 s | 0.55 s | 0.46 s | 1,706 MB | 702 MB |
-| Panasonic S1R II, 44 MP | GPU | 1.14 s | 1.89 s | 1.86 s | 0.72 s | 3,674 MB | 1,388 MB |
-| Sony a1, 50 MP | GPU | 0.90 s | 1.33 s | 1.00 s | 0.49 s | 3,632 MB | 1,345 MB |
-| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 0.67 s | 1.01 s | 0.95 s | 11.01 s | 2,510 MB | 1,673 MB |
-| Fujifilm GFX100 II, 102 MP | GPU | 1.57 s | 2.28 s | 2.19 s | 3.80 s | 6,041 MB | 2,839 MB |
+| Sony a9 III, 10 MP crop mode | GPU | 0.39 s | 0.54 s | 0.48 s | 0.15 s | 1,279 MB | 375 MB |
+| Canon EOS R3, 24 MP | GPU | 0.61 s | 0.93 s | 0.88 s | 0.40 s | 2,148 MB | 688 MB |
+| Nikon Z f, 24 MP | GPU | 0.42 s | 0.59 s | 0.52 s | 0.45 s | 1,706 MB | 703 MB |
+| Panasonic S1R II, 44 MP | GPU | 1.13 s | 1.87 s | 1.82 s | 0.70 s | 3,674 MB | 1,392 MB |
+| Sony a1, 50 MP | GPU | 0.90 s | 1.33 s | 0.99 s | 0.50 s | 3,624 MB | 1,345 MB |
+| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 0.69 s | 1.04 s | 0.94 s | 11.32 s | 2,510 MB | 1,518 MB |
+| Fujifilm GFX100 II, 102 MP | GPU | 1.54 s | 2.26 s | 2.15 s | 3.84 s | 6,040 MB | 2,838 MB |
 
 "Apple via `RawInput.open`" uses automatic routing in a fresh process and so includes the
 support check. The check runs for the first file of each camera and recording mode.
@@ -205,33 +205,48 @@ support check. The check runs for the first file of each camera and recording mo
   under 2 s, in every launch. The time is spent setting up the decoder before any pixel is
   requested. I could not determine the cause.
 
-Phone figures are single launches, so differences of a tenth of a second are within noise.
+Phone figures are the median of three launches.
 Peak memory includes the benchmark's output buffer at 4 bytes per pixel.
 
 ### The ten samples only the fallback opens, on the phone
 
 | Sample | Path | Embedded preview | File to rendered image | Peak memory |
 |---|---|---|---|---|
-| Samsung NX1, 28 MP | GPU | 53 ms | 0.66 s | 582 MB |
-| Samsung NX300, 20 MP | GPU | 44 ms | 0.37 s | 436 MB |
-| Fujifilm X-E3, 24 MP | CPU | 26 ms | 5.15 s | 697 MB |
-| Olympus E-M10 Mark IIIs, 12 MP | GPU | 30 ms | 0.39 s | 281 MB |
-| Panasonic DC-FZ45, 18 MP | GPU | 34 ms | 0.23 s | 384 MB |
-| Sigma dp0 Quattro, 20 MP | CPU | 57 ms | 1.03 s | 784 MB |
-| Pentax K-3 Mark III Monochrome, 26 MP | CPU | 52 ms | 0.60 s | 641 MB |
-| Phase One IQ180, 20 MP | CPU | 44 ms | 1.47 s | 617 MB |
-| Canon PowerShot S100V, 12 MP | GPU | 29 ms | 0.30 s | 271 MB |
-| DJI Osmo Action, 12 MP | GPU | 28 ms | 0.14 s | 266 MB |
+| Samsung NX1, 28 MP | GPU | 54 ms | 0.67 s | 583 MB |
+| Samsung NX300, 20 MP | GPU | 40 ms | 0.46 s | 531 MB |
+| Fujifilm X-E3, 24 MP | CPU | 25 ms | 5.63 s | 858 MB |
+| Olympus E-M10 Mark IIIs, 12 MP | GPU | 29 ms | 0.43 s | 364 MB |
+| Panasonic DC-FZ45, 18 MP | GPU | 22 ms | 0.27 s | 481 MB |
+| Sigma dp0 Quattro, 20 MP | CPU | 54 ms | 1.12 s | 989 MB |
+| Pentax K-3 Mark III Monochrome, 26 MP | CPU | 51 ms | 0.71 s | 806 MB |
+| Phase One IQ180, 20 MP | CPU | 37 ms | 1.51 s | 822 MB |
+| Canon PowerShot S100V, 12 MP | GPU | 22 ms | 0.34 s | 353 MB |
+| DJI Osmo Action, 12 MP | GPU | 27 ms | 0.17 s | 349 MB |
 
-Only the first row includes the fallback's exposure measurement and colour check. The
-other nine were measured before those were added and would now be about 0.05 to 0.15 s
-slower. Across all files measured on the phone the embedded preview takes 24 to 78 ms.
+Every row includes the fallback's exposure measurement and color check. Across all files
+measured on the phone the embedded preview takes 22 to 74 ms.
+
+## Binary size
+
+The demo's arm64 Release build, after dead-code stripping, from the linker's map:
+
+| Part | Size |
+|---|---|
+| LibRaw | 848 KB |
+| The C interface | 4 KB |
+| RawInputKit (Swift) | 148 KB |
+
+That is code and data in the executable before App Store compression. An app that used
+Apple's decoder alone would carry neither LibRaw nor most of the Swift library.
 
 ## Damaged files
 
 `rawprobe fuzz` decodes seeded, damaged copies of real files, each in a child process. Two
 runs over eight sample files, 800 cases in a release build and 400 under AddressSanitizer,
 produced no crashes or hangs.
+
+CI now runs 60 cases under AddressSanitizer on every push, with a seed that changes each
+run, and decodes each case from disk and from memory.
 
 This is mutation fuzzing of the project's own handling of sizes, margins and levels, and
 is no substitute for coverage-guided fuzzing of LibRaw. A known gap: a truncated file in

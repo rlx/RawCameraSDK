@@ -3,8 +3,8 @@ import simd
 
 let testContext = CIContext()
 
-/// Average linear sRGB colour of the central half of an image.
-func centreColor(_ image: CIImage) -> SIMD3<Float> {
+/// Average linear sRGB color of the central half of an image.
+func centerColor(_ image: CIImage) -> SIMD3<Float> {
     let crop = image.extent.insetBy(dx: image.extent.width / 4, dy: image.extent.height / 4)
     let average = image.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: crop)])
     var pixel = [Float](repeating: 0, count: 4)

@@ -21,7 +21,7 @@ FLAT = [0.2, 0.5, 0.8]
 
 
 def mosaic(pattern, color, black_levels):
-    """`color(x, y)` is the scene colour at a picture coordinate, 0..1 per channel; each
+    """`color(x, y)` is the scene color at a picture coordinate, 0..1 per channel; each
     sensor site records only its own channel of it."""
     raw_width, raw_height = SIZE[0] + 5, SIZE[1] + 3
     samples = [65535] * (raw_width * raw_height)
@@ -53,7 +53,7 @@ def case(name, pattern, color, expect, why, half=False, black_levels=None, white
             "size": list(SIZE),
             "white": WHITE,
         },
-        # Either one colour every output pixel must have, or particular pixels to check.
+        # Either one color every output pixel must have, or particular pixels to check.
         **expect,
     }
 
@@ -64,26 +64,26 @@ def cases():
         flat = lambda x, y: FLAT
         out.append(case(
             f"flat-{name}", pattern, flat, {"everyPixel": FLAT},
-            "A flat colour must survive demosaicing at every pixel, borders included: a wrong "
+            "A flat color must survive demosaicing at every pixel, borders included: a wrong "
             "pattern index, a wrong origin or a read of the masked border each change some."))
         out.append(case(
             f"half-{name}", pattern, flat, {"everyPixel": FLAT}, half=True,
             why="Half size merges each 2x2 cell into one pixel: its red, its blue, the mean of its greens."))
         out.append(case(
             f"black-levels-{name}", pattern, flat, {"everyPixel": FLAT}, black_levels=[40.0, 64.0, 88.0, 120.0],
-            why="Black level is per mosaic position, not per colour, and indexed in picture "
+            why="Black level is per mosaic position, not per color, and indexed in picture "
                 "coordinates. Getting that wrong leaves a checkerboard on a flat field."))
 
     rggb = PATTERNS["rggb"]
-    grey = lambda v: [v, v, v]
+    gray = lambda v: [v, v, v]
     out.append(case(
-        "top-is-top", rggb, lambda x, y: grey(0.1 if y < 4 else 0.9),
-        {"pixels": [{"x": 4, "y": 0, "rgb": grey(0.1)}, {"x": 4, "y": 7, "rgb": grey(0.9)}]},
+        "top-is-top", rggb, lambda x, y: gray(0.1 if y < 4 else 0.9),
+        {"pixels": [{"x": 4, "y": 0, "rgb": gray(0.1)}, {"x": 4, "y": 7, "rgb": gray(0.9)}]},
         "Row 0 of the output is the top of the picture. Graphics APIs disagree about which way "
         "is up, and a flipped image is still a valid image."))
     out.append(case(
-        "left-is-left", rggb, lambda x, y: grey(0.1 if x < 4 else 0.9),
-        {"pixels": [{"x": 0, "y": 4, "rgb": grey(0.1)}, {"x": 7, "y": 4, "rgb": grey(0.9)}]},
+        "left-is-left", rggb, lambda x, y: gray(0.1 if x < 4 else 0.9),
+        {"pixels": [{"x": 0, "y": 4, "rgb": gray(0.1)}, {"x": 7, "y": 4, "rgb": gray(0.9)}]},
         "Column 0 of the output is the left of the picture."))
     out.append(case(
         "white-balance", rggb, lambda x, y: [0.2, 0.4, 0.2], {"everyPixel": [0.4, 0.4, 0.3]},

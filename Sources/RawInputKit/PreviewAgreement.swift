@@ -1,13 +1,13 @@
 import CoreImage
 import simd
 
-/// An image averaged down to a coarse grid of colours, for comparing two renderings of the
+/// An image averaged down to a coarse grid of colors, for comparing two renderings of the
 /// same picture. Not part of the supported API.
 @_spi(Measurement)
 public enum ColorGrid {
     public static let columns = 24, rows = 16
 
-    /// Linear sRGB colours, row by row from the top, or `nil` for an empty or infinite image.
+    /// Linear sRGB colors, row by row from the top, or `nil` for an empty or infinite image.
     /// The image is stretched to the grid whatever its aspect ratio.
     public static func colors(of image: CIImage, context: CIContext) -> [SIMD3<Float>]? {
         let extent = image.extent

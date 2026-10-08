@@ -26,10 +26,10 @@
   {
     "camera" : "Fujifilm S3Pro",
     "file" : "038e5a13-Fujifilm_-_FinePix_S3Pro_-_3_2.RAF",
-    "linear" : 7.75306510925293,
-    "ownOutput" : 8.821946144104004,
-    "sharedFilm" : 8.054736137390137,
-    "sharedNeutral" : 8.46239948272705
+    "linear" : 7.751213550567627,
+    "ownOutput" : 8.811394691467285,
+    "sharedFilm" : 8.057215690612793,
+    "sharedNeutral" : 8.46424388885498
   },
   {
     "camera" : "Sony ILCE-6600",
@@ -162,10 +162,10 @@
   {
     "camera" : "Samsung SM-S901U",
     "file" : "13ddd4b1-Samsung_-_Galaxy_S22_Ultra_-_4_3.dng",
-    "linear" : 0.7476875185966492,
-    "ownOutput" : 2.714524984359741,
-    "sharedFilm" : 0.8391873836517334,
-    "sharedNeutral" : 0.8584603667259216
+    "linear" : 0.7465953826904297,
+    "ownOutput" : 2.715331792831421,
+    "sharedFilm" : 0.8403200507164001,
+    "sharedNeutral" : 0.8583853840827942
   },
   {
     "camera" : "Fujifilm GFX100RF",
@@ -178,10 +178,10 @@
   {
     "camera" : "Fujifilm X-Pro3",
     "file" : "151353de-Fujifilm_-_X-Pro3_-_14bit_14bit_compressed_(3_2).RAF",
-    "linear" : 1.1868221759796143,
-    "ownOutput" : 14.701193809509277,
-    "sharedFilm" : 1.1012675762176514,
-    "sharedNeutral" : 1.1787855625152588
+    "linear" : 1.1881251335144043,
+    "ownOutput" : 14.701964378356934,
+    "sharedFilm" : 1.1015530824661255,
+    "sharedNeutral" : 1.18118155002594
   },
   {
     "camera" : "OnePlus A3003",
@@ -242,10 +242,10 @@
   {
     "camera" : "Phase One P25",
     "file" : "1d737754-Phase_One_-_P25_-_IIQ_S_(4_3).TIF",
-    "linear" : 7.6392035484313965,
-    "ownOutput" : 29.582008361816406,
-    "sharedFilm" : 8.613409996032715,
-    "sharedNeutral" : 9.354393005371094
+    "linear" : 7.637481689453125,
+    "ownOutput" : 29.580659866333008,
+    "sharedFilm" : 8.612156867980957,
+    "sharedNeutral" : 9.353915214538574
   },
   {
     "camera" : "Sony SLT-A65",
@@ -290,34 +290,34 @@
   {
     "camera" : "Fujifilm X-T50",
     "file" : "23531624-Fujifilm_-_X-T50_-_14bit_lossless_compressed_(3_2).RAF",
-    "linear" : 3.921921968460083,
-    "ownOutput" : 11.236946105957031,
-    "sharedFilm" : 3.8266286849975586,
-    "sharedNeutral" : 4.355872631072998
+    "linear" : 3.923386335372925,
+    "ownOutput" : 11.236384391784668,
+    "sharedFilm" : 3.8257267475128174,
+    "sharedNeutral" : 4.356631755828857
   },
   {
     "camera" : "Canon EOS 60D",
     "file" : "24894521-Canon_-_EOS_60D_-_sRAW2_(sRAW)_(3_2).CR2",
-    "linear" : 1.3957659006118774,
-    "ownOutput" : 10.364030838012695,
-    "sharedFilm" : 1.4658108949661255,
-    "sharedNeutral" : 1.724603295326233
+    "linear" : 1.4095168113708496,
+    "ownOutput" : 10.328689575195312,
+    "sharedFilm" : 1.4898113012313843,
+    "sharedNeutral" : 1.74183189868927
   },
   {
     "camera" : "Sony ILCE-7CR",
     "file" : "25f243fd-Sony_-_ILCE-7CR_-_losseless_compressed_(4_3).ARW",
-    "linear" : 2.7753546237945557,
-    "ownOutput" : 3.634448289871216,
-    "sharedFilm" : 2.77251935005188,
-    "sharedNeutral" : 3.009005546569824
+    "linear" : 2.776010751724243,
+    "ownOutput" : 3.634401559829712,
+    "sharedFilm" : 2.772937536239624,
+    "sharedNeutral" : 3.0093624591827393
   },
   {
     "camera" : "Canon EOS 5DS R",
     "file" : "26868d8b-Canon_-_EOS_5DS_R_-_sRAW2_(sRAW)_(3_2).CR2",
-    "linear" : 8.105181694030762,
-    "ownOutput" : 25.8392391204834,
-    "sharedFilm" : 6.4302496910095215,
-    "sharedNeutral" : 6.478193759918213
+    "linear" : 8.106402397155762,
+    "ownOutput" : 25.840599060058594,
+    "sharedFilm" : 6.430225372314453,
+    "sharedNeutral" : 6.477310657501221
   },
   {
     "camera" : "Pentax *ist DS",
@@ -378,10 +378,10 @@
   {
     "camera" : "Canon EOS 5DS",
     "file" : "32a24316-Canon_-_EOS_5DS_-_sRAW2_(sRAW)_(3_2).CR2",
-    "linear" : 4.213433742523193,
-    "ownOutput" : 14.150260925292969,
-    "sharedFilm" : 5.191810607910156,
-    "sharedNeutral" : 5.3293633460998535
+    "linear" : 4.214426040649414,
+    "ownOutput" : 14.15081787109375,
+    "sharedFilm" : 5.1921467781066895,
+    "sharedNeutral" : 5.328629493713379
   },
   {
     "camera" : "Sony ILCE-7RM4",
@@ -426,10 +426,10 @@
   {
     "camera" : "Fujifilm X-T50",
     "file" : "3a8a9ac6-Fujifilm_-_X-T50_-_14bit_compressed_(3_2).RAF",
-    "linear" : 4.08068323135376,
-    "ownOutput" : 11.1586332321167,
-    "sharedFilm" : 4.022696018218994,
-    "sharedNeutral" : 4.436869144439697
+    "linear" : 4.0814409255981445,
+    "ownOutput" : 11.158492088317871,
+    "sharedFilm" : 4.0222086906433105,
+    "sharedNeutral" : 4.435769557952881
   },
   {
     "camera" : "Samsung SM-G955F",
@@ -602,10 +602,10 @@
   {
     "camera" : "Samsung SM-S908U1",
     "file" : "53e7f83a-Samsung_-_Galaxy_S22_Ulra_-_4_3.dng",
-    "linear" : 14.857251167297363,
-    "ownOutput" : 5.62163782119751,
-    "sharedFilm" : 18.674131393432617,
-    "sharedNeutral" : 18.615867614746094
+    "linear" : 14.864136695861816,
+    "ownOutput" : 5.617137432098389,
+    "sharedFilm" : 18.673738479614258,
+    "sharedNeutral" : 18.61557960510254
   },
   {
     "camera" : "Google Pixel 2 XL",
@@ -634,10 +634,10 @@
   {
     "camera" : "Sony ILME-FX2",
     "file" : "58273536-Sony_-_ILME-FX2_-_4_3.ARW",
-    "linear" : 4.576277256011963,
-    "ownOutput" : 11.846419334411621,
-    "sharedFilm" : 4.184509754180908,
-    "sharedNeutral" : 4.509822845458984
+    "linear" : 4.565119743347168,
+    "ownOutput" : 11.830384254455566,
+    "sharedFilm" : 4.170082092285156,
+    "sharedNeutral" : 4.49483060836792
   },
   {
     "camera" : "Fujifilm GFX50S II",
@@ -658,10 +658,10 @@
   {
     "camera" : "Fujifilm X-M5",
     "file" : "5c904381-Fujifilm_-_X-M5_-_14bit_uncompressed_(3_2).RAF",
-    "linear" : 1.075057864189148,
-    "ownOutput" : 13.883755683898926,
-    "sharedFilm" : 1.1949347257614136,
-    "sharedNeutral" : 1.2507728338241577
+    "linear" : 1.0752346515655518,
+    "ownOutput" : 13.88375473022461,
+    "sharedFilm" : 1.194491982460022,
+    "sharedNeutral" : 1.2515636682510376
   },
   {
     "camera" : "Xiaomi Mi 9 Lite",
@@ -762,10 +762,10 @@
   {
     "camera" : "Fujifilm X-H2S",
     "file" : "6f41bbc2-Fujifilm_-_X-H2S_-_14bit_14bit_uncompressed_(3_2).raf",
-    "linear" : 3.9548377990722656,
-    "ownOutput" : 5.410025119781494,
-    "sharedFilm" : 4.163172245025635,
-    "sharedNeutral" : 4.396358966827393
+    "linear" : 3.954908609390259,
+    "ownOutput" : 5.41054105758667,
+    "sharedFilm" : 4.1633830070495605,
+    "sharedNeutral" : 4.39632511138916
   },
   {
     "camera" : "Minolta DYNAX 7D",
@@ -786,10 +786,10 @@
   {
     "camera" : "Fujifilm X-E2",
     "file" : "7588c70a-Fujifilm_-_X-E2_-_14bit_14bit_uncompressed_(3_2).RAF",
-    "linear" : 3.6709671020507812,
-    "ownOutput" : 12.130579948425293,
-    "sharedFilm" : 3.6143152713775635,
-    "sharedNeutral" : 4.192802906036377
+    "linear" : 3.6725666522979736,
+    "ownOutput" : 12.130897521972656,
+    "sharedFilm" : 3.6159584522247314,
+    "sharedNeutral" : 4.195428371429443
   },
   {
     "camera" : "Olympus E-M10MarkIV",
@@ -978,10 +978,10 @@
   {
     "camera" : "Fujifilm X-Pro2",
     "file" : "9502fddc-Fujifilm_-_X-Pro2_-_14bit_14bit_compressed_(3_2).RAF",
-    "linear" : 3.38387393951416,
-    "ownOutput" : 13.460731506347656,
-    "sharedFilm" : 3.8491432666778564,
-    "sharedNeutral" : 4.293664455413818
+    "linear" : 3.3834123611450195,
+    "ownOutput" : 13.4605073928833,
+    "sharedFilm" : 3.849627733230591,
+    "sharedNeutral" : 4.293687343597412
   },
   {
     "camera" : "Huawei VTR-L09",
@@ -1010,10 +1010,10 @@
   {
     "camera" : "Canon EOS-1D Mark IV",
     "file" : "994de61e-Canon_-_EOS-1D_Mark_IV_-_sRAW2_(sRAW)_(3_2).CR2",
-    "linear" : 1.26649010181427,
-    "ownOutput" : 6.83897590637207,
-    "sharedFilm" : 1.0609711408615112,
-    "sharedNeutral" : 1.0439915657043457
+    "linear" : 1.2668235301971436,
+    "ownOutput" : 6.839742660522461,
+    "sharedFilm" : 1.060576319694519,
+    "sharedNeutral" : 1.0457664728164673
   },
   {
     "camera" : "Yuneec CGO3P",
@@ -1130,10 +1130,10 @@
   {
     "camera" : "Fujifilm X-E4",
     "file" : "abf49096-Fujifilm_-_X-E4_-_14bit_14bit_compressed_(3_2).RAF",
-    "linear" : 1.077357292175293,
-    "ownOutput" : 22.148033142089844,
-    "sharedFilm" : 0.6681702733039856,
-    "sharedNeutral" : 0.8571060299873352
+    "linear" : 1.0767062902450562,
+    "ownOutput" : 22.147560119628906,
+    "sharedFilm" : 0.6669489741325378,
+    "sharedNeutral" : 0.8582479357719421
   },
   {
     "camera" : "Panasonic DMC-LX1",
@@ -1258,10 +1258,10 @@
   {
     "camera" : "Fujifilm X100F",
     "file" : "bca8ad02-Fujifilm_-_X100F_-_14bit_14bit_compressed_(3_2).RAF",
-    "linear" : 2.9355170726776123,
-    "ownOutput" : 8.996109962463379,
-    "sharedFilm" : 2.81854510307312,
-    "sharedNeutral" : 3.1085243225097656
+    "linear" : 2.9362447261810303,
+    "ownOutput" : 8.99666690826416,
+    "sharedFilm" : 2.817793130874634,
+    "sharedNeutral" : 3.1089885234832764
   },
   {
     "camera" : "Panasonic DMC-GF8",
@@ -1482,10 +1482,10 @@
   {
     "camera" : "Canon EOS 5D Mark II",
     "file" : "e8a31e7d-Canon_-_EOS_5D_Mark_II_-_sRAW2_(sRAW)_(3_2).cr2",
-    "linear" : 3.703141927719116,
-    "ownOutput" : 19.07477378845215,
-    "sharedFilm" : 3.3685495853424072,
-    "sharedNeutral" : 3.6511125564575195
+    "linear" : 3.701587677001953,
+    "ownOutput" : 19.038339614868164,
+    "sharedFilm" : 3.380084276199341,
+    "sharedNeutral" : 3.6614444255828857
   },
   {
     "camera" : "Canon EOS 450D",
@@ -1554,10 +1554,10 @@
   {
     "camera" : "Fujifilm X-T2",
     "file" : "f756ad5b-Fujifilm_-_X-T2_-_14bit_14bit_compressed_(3_2).RAF",
-    "linear" : 2.5065157413482666,
-    "ownOutput" : 4.730098724365234,
-    "sharedFilm" : 2.667363405227661,
-    "sharedNeutral" : 2.767144203186035
+    "linear" : 2.5067713260650635,
+    "ownOutput" : 4.730382442474365,
+    "sharedFilm" : 2.667930841445923,
+    "sharedNeutral" : 2.7676010131835938
   },
   {
     "camera" : "LG VS995",
@@ -1610,9 +1610,9 @@
   {
     "camera" : "Fujifilm X-E5",
     "file" : "ff94e2e0-Fujifilm_-_X-E5_-_14bit_lossless_compressed_(3_2).RAF",
-    "linear" : 6.448339939117432,
-    "ownOutput" : 6.433608531951904,
-    "sharedFilm" : 6.321329593658447,
-    "sharedNeutral" : 6.91351318359375
+    "linear" : 6.141886234283447,
+    "ownOutput" : 6.737663269042969,
+    "sharedFilm" : 5.9239115715026855,
+    "sharedNeutral" : 6.61332893371582
   }
 ]

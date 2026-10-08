@@ -9,9 +9,9 @@ Measured with `rawprobe` on macOS 27.0.1 (arm64), over 944 CC0 files from raw.pi
 | Only Apple opens it | 14 |
 | Neither opens it | 16 |
 
-Fallback decode time, median: 0.22 s on the Metal path (784 files), 1.46 s on the CPU path (130 files).
+Fallback decode time, median: 0.22 s on the Metal path (784 files), 1.40 s on the CPU path (130 files).
 
-"Opens" means pixels came out. It does not mean the colour is right, so each fallback result is also compared with the camera's embedded preview: 15 of 822 files with a preview differ enough to be suspect (listed at the end).
+"Opens" means pixels came out. It does not mean the color is right, so each fallback result is also compared with the camera's embedded preview: 15 of 822 files with a preview differ enough to be suspect (listed at the end).
 
 ## Only the fallback opens it
 
@@ -78,7 +78,7 @@ Fallback decode time, median: 0.22 s on the Metal path (784 files), 1.46 s on th
 - GoPro HERO8 Black (16bit (4:3)), GPR: `vc5_dng_load_raw_placeholder()`
 - GoPro HERO9 Black (16bit (4:3)), GPR: `vc5_dng_load_raw_placeholder()`
 
-## Fallback opens it but the colour is suspect
+## Fallback opens it but the color is suspect
 
 - Ricoh GXR S10 (12bit (4:3)), DNG: distance 0.30
 - Canon EOS R6 Mark III (RAW (3:2)), CR3: distance 0.27

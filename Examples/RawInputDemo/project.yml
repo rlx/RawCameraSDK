@@ -105,5 +105,5 @@ schemes:
       targets:
         - RawInputDemoTests
     run:
-      # Release. The fallback's CPU paths (X-Trans, Foveon) are many times slower unoptimised.
+      # Release. The fallback's CPU paths (X-Trans, Foveon) are many times slower unoptimized.
       config: Release

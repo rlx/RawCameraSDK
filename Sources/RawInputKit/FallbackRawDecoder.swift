@@ -1,5 +1,6 @@
 import CoreImage
 import Foundation
+import Metal
 import RawShim
 
 /// The fallback route: LibRaw decodes the sensor data, then one of two paths develops it.
@@ -10,8 +11,10 @@ import RawShim
 /// CPU path, for everything else (X-Trans, Foveon, monochrome, already-demosaiced files,
 /// Phase One backs, Fuji SuperCCD): LibRaw develops, single-threaded. Takes seconds.
 ///
-/// Both produce an upright, scene-linear image with sRGB primaries. The core chooses the
-/// path (`rik_info.plain_bayer`).
+/// Both produce an upright, scene-linear image that keeps colors outside sRGB. The GPU path
+/// writes extended linear sRGB as floats, where such colors have components below 0. The
+/// CPU path's 16-bit integers cannot go below 0, so it converts to Rec. 2020 primaries
+/// instead. The core chooses the path (`rik_info.plain_bayer`).
 enum FallbackRawDecoder {
     struct Result {
         var image: CIImage
@@ -21,12 +24,15 @@ enum FallbackRawDecoder {
         var isHalfSize: Bool
         var path: RawFallbackPath
         var previewDistance: Double?
+        /// The GPU path's output, for `RawImage.makeTexture` to hand over without a copy.
+        var texture: MTLTexture?
     }
 
     static let version = String(cString: rik_libraw_version()).replacingOccurrences(of: "-Release", with: "")
 
-    static func decode(_ url: URL, options: RawDecodeOptions) throws -> Result {
-        let file = try LibRawFile(url)
+    static func decode(_ source: RawSource, options: RawDecodeOptions) throws -> Result {
+        let file = try LibRawFile(source)
+        file.useWideGamutOutput()
         file.setMemoryLimit(megabytes: options.fallbackMemoryLimitMB)
         if let isCancelled = options.isCancelled { file.setCancellation(isCancelled) }
         var result = try develop(file, options: options)
@@ -63,10 +69,12 @@ enum FallbackRawDecoder {
                         mosaic: samples, rowBytes: rowBytes, rawWidth: Int(raw.raw_width),
                         rawHeight: Int(raw.raw_height), parameters: parameters, halfSize: wantsHalf)
                 }
-                if let image = developed {
+                if let developed {
+                    let image = developed.image
                     return Result(
                         image: image.oriented(info.orientation), decoder: "LibRaw \(version) + Metal",
-                        info: info, exposureEV: ExposureEstimate.measure(image), isHalfSize: wantsHalf, path: .gpu)
+                        info: info, exposureEV: ExposureEstimate.measure(image), isHalfSize: wantsHalf, path: .gpu,
+                        texture: developed.texture)
                 }
             } catch {
                 // Reported because the CPU path takes seconds.
@@ -91,7 +99,7 @@ enum FallbackRawDecoder {
                 let out = buffer.bindMemory(to: UInt16.self).baseAddress!
                 for pixel in 0..<(width * height) {
                     let r = source[pixel * channels]
-                    let g = channels == 3 ? source[pixel * 3 + 1] : r  // monochrome: grey in all three
+                    let g = channels == 3 ? source[pixel * 3 + 1] : r  // monochrome: gray in all three
                     let b = channels == 3 ? source[pixel * 3 + 2] : r
                     out[pixel * 4] = r
                     out[pixel * 4 + 1] = g
@@ -102,7 +110,7 @@ enum FallbackRawDecoder {
             // Row 0 is the top of the picture, as Core Image expects. No flip is needed.
             let image = CIImage(
                 bitmapData: rgba, bytesPerRow: width * 8, size: CGSize(width: width, height: height),
-                format: .RGBA16, colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB))
+                format: .RGBA16, colorSpace: CGColorSpace(name: CGColorSpace.linearITUR_2020))
 
             // LibRaw resamples a few sensors (Fuji SuperCCD, non-square pixels), so the size
             // is taken from the returned frame.

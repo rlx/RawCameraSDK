@@ -2,7 +2,7 @@
 // Same algorithm as the Metal edition in Sources/RawInputKit/MetalDevelop.swift. Both are
 // checked against Conformance/kernel-cases.json.
 //
-// Per output pixel: subtract black, normalise to white, white balance, clip, demosaic,
+// Per output pixel: subtract black, normalize to white, white balance, clip, demosaic,
 // then a 3x3 matrix from camera RGB to linear sRGB.
 //
 // The mosaic texture holds the whole raw plane. The kernel works in picture coordinates,
@@ -11,11 +11,11 @@
 // `rik_develop_params` from RawShim.h, byte for byte (128 bytes).
 struct Params {
     black: vec4f,     // per mosaic position: (row & 1) * 2 + (column & 1)
-    wb: vec4f,        // per colour; the smallest multiplier is 1
+    wb: vec4f,        // per color; the smallest multiplier is 1
     m0: vec4f,        // rows of the matrix: white-balanced camera RGB -> linear sRGB
     m1: vec4f,
     m2: vec4f,
-    pattern: vec4u,   // colour at each mosaic position: 0 R, 1 G, 2 B
+    pattern: vec4u,   // color at each mosaic position: 0 R, 1 G, 2 B
     origin: vec2u,    // picture offset inside the raw plane
     size: vec2u,      // picture size
     white: f32,
@@ -34,7 +34,7 @@ fn position(p: vec2i) -> u32 {
 }
 
 // One sensor sample: black subtracted, scaled so sensor white is 1, white-balanced.
-// Coordinates outside the picture are mirrored about the edge pixel, which keeps the colour.
+// Coordinates outside the picture are mirrored about the edge pixel, which keeps the color.
 // The clip to 1 must follow white balance, or blown highlights turn magenta.
 fn value(at: vec2i) -> f32 {
     let last = vec2i(params.size) - 1;
@@ -48,7 +48,7 @@ fn value(at: vec2i) -> f32 {
 }
 
 // Green at any pixel. At a red or blue site it is interpolated along the direction of least
-// change (Hamilton-Adams), corrected by the curvature of the colour sampled there.
+// change (Hamilton-Adams), corrected by the curvature of the color sampled there.
 fn green(p: vec2i) -> f32 {
     let c = value(p);
     if (params.pattern[position(p)] == 1u) {
@@ -75,7 +75,7 @@ fn green(p: vec2i) -> f32 {
     return max(g, 0.0);
 }
 
-// Red or blue minus green, at a red or blue site. Colour differences vary slowly, so they
+// Red or blue minus green, at a red or blue site. Color differences vary slowly, so they
 // are safe to average.
 fn chroma(p: vec2i) -> f32 {
     return value(p) - green(p);
@@ -99,7 +99,7 @@ fn develop_full(@builtin(global_invocation_id) id: vec3u) {
 
     if (color == 1u) {
         // One of red/blue is left and right, the other above and below.
-        // `2 - colour` swaps red (0) and blue (2).
+        // `2 - color` swaps red (0) and blue (2).
         let horizontal = (chroma(p + vec2i(-1, 0)) + chroma(p + vec2i(1, 0))) * 0.5;
         let vertical = (chroma(p + vec2i(0, -1)) + chroma(p + vec2i(0, 1))) * 0.5;
         let horizontal_color = params.pattern[position(p + vec2i(1, 0))];

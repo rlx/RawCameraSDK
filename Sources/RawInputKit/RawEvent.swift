@@ -9,7 +9,7 @@ public enum RawEvent: Sendable, Equatable {
     case appleRejected(camera: String, routine: String?)
     /// The GPU path failed and the CPU path took over.
     case gpuDevelopFailed(camera: String, reason: String)
-    /// The fallback's colours disagree with the camera's embedded preview.
+    /// The fallback's colors disagree with the camera's embedded preview.
     case colorSuspect(camera: String, distance: Double)
     /// A file was opened. `seconds` is the time spent inside `RawInput.open`. On the Apple
     /// route that excludes the decode, which happens at render time.

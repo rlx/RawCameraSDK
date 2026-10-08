@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SUSPECT = 0.15
 
 pool = {e["file"]: e for e in json.loads((ROOT / "Tests" / "corpus-pool.json").read_text())}
-# Files outside the pool have no catalogue entry and are left out.
+# Files outside the pool have no catalog entry and are left out.
 rows = [r for r in json.loads((ROOT / "Tests" / "probe-results.json").read_text()) if r["file"] in pool]
 
 
@@ -56,7 +56,7 @@ out = [
     f"Fallback decode time, median: {statistics.median(metal):.2f} s on the Metal path "
     f"({len(metal)} files), {statistics.median(cpu):.2f} s on the CPU path ({len(cpu)} files).",
     "",
-    "\"Opens\" means pixels came out. It does not mean the colour is right, so each fallback "
+    "\"Opens\" means pixels came out. It does not mean the color is right, so each fallback "
     "result is also compared with the camera's embedded preview: "
     f"{len(suspect)} of {len(checked)} files with a preview differ enough to be suspect "
     "(listed at the end).",
@@ -78,7 +78,7 @@ out += ["", "## Only Apple opens it", ""]
 out += [f"- {label(r)}: `{r['routine']}`" for r in sorted(apple_only, key=label)]
 out += ["", "## Neither opens it", ""]
 out += [f"- {label(r)}: `{r['routine']}`" for r in sorted(neither, key=label)]
-out += ["", "## Fallback opens it but the colour is suspect", ""]
+out += ["", "## Fallback opens it but the color is suspect", ""]
 out += [
     f"- {label(r)}: distance {r['fallbackPreviewDistance']:.2f}"
     + ("" if r["apple"] else " (Apple cannot open it either)")

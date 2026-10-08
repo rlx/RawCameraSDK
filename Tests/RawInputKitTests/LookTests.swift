@@ -5,20 +5,20 @@ import simd
 
 @Suite("Looks")
 struct LookTests {
-    static let greys = stride(from: 0.0, through: 1.0, by: 0.05).map { SIMD3<Double>(repeating: $0) }
+    static let grays = stride(from: 0.0, through: 1.0, by: 0.05).map { SIMD3<Double>(repeating: $0) }
 
-    @Test func neutralKeepsBlackWhiteAndGreyNeutral() {
+    @Test func neutralKeepsBlackWhiteAndGrayNeutral() {
         #expect(simd_distance(RawLook.neutral.apply(.zero), .zero) < 1e-9)
         #expect(simd_distance(RawLook.neutral.apply(.one), .one) < 1e-9)
-        for grey in Self.greys {
-            let out = RawLook.neutral.apply(grey)
-            #expect(abs(out.x - out.y) < 1e-9 && abs(out.y - out.z) < 1e-9, "a grey stays grey")
+        for gray in Self.grays {
+            let out = RawLook.neutral.apply(gray)
+            #expect(abs(out.x - out.y) < 1e-9 && abs(out.y - out.z) < 1e-9, "a gray stays gray")
         }
     }
 
     @Test(arguments: [RawLook.neutral, .film])
     func toneCurveNeverReverses(_ look: RawLook) {
-        let lumas = Self.greys.map { look.apply($0) }.map { 0.2126 * $0.x + 0.7152 * $0.y + 0.0722 * $0.z }
+        let lumas = Self.grays.map { look.apply($0) }.map { 0.2126 * $0.x + 0.7152 * $0.y + 0.0722 * $0.z }
         for (darker, lighter) in zip(lumas, lumas.dropFirst()) {
             #expect(lighter >= darker)
         }
@@ -36,7 +36,7 @@ struct LookTests {
         #expect(white.x > white.z, "highlights lean toward red")
     }
 
-    @Test func desaturationPullsColorTowardGrey() {
+    @Test func desaturationPullsColorTowardGray() {
         let red = SIMD3<Double>(0.8, 0.2, 0.2)
         let spread = { (c: SIMD3<Double>) in c.max() - c.min() }
         #expect(spread(RawLook(contrast: 0, saturation: 0.5).apply(red)) < spread(red))
@@ -61,11 +61,11 @@ struct LookTests {
     }
 
     @Test func renderedImageMatchesTheMaths() {
-        let grey = CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)!)
+        let gray = CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)!)
             .cropped(to: CGRect(x: 0, y: 0, width: 8, height: 8))
         var pixel = [UInt8](repeating: 0, count: 4)
         testContext.render(
-            RawLook.film.filter(on: grey), toBitmap: &pixel, rowBytes: 4, bounds: CGRect(x: 4, y: 4, width: 1, height: 1),
+            RawLook.film.filter(on: gray), toBitmap: &pixel, rowBytes: 4, bounds: CGRect(x: 4, y: 4, width: 1, height: 1),
             format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
         let expected = RawLook.film.apply(SIMD3(repeating: 0.5))
         for channel in 0..<3 {

@@ -5,7 +5,7 @@
  "cases": [
   {
    "name": "flat-rggb",
-   "why": "A flat colour must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
+   "why": "A flat color must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
@@ -417,7 +417,7 @@
   },
   {
    "name": "black-levels-rggb",
-   "why": "Black level is per mosaic position, not per colour, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
+   "why": "Black level is per mosaic position, not per color, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
@@ -623,7 +623,7 @@
   },
   {
    "name": "flat-bggr",
-   "why": "A flat colour must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
+   "why": "A flat color must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
@@ -1035,7 +1035,7 @@
   },
   {
    "name": "black-levels-bggr",
-   "why": "Black level is per mosaic position, not per colour, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
+   "why": "Black level is per mosaic position, not per color, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
@@ -1241,7 +1241,7 @@
   },
   {
    "name": "flat-grbg",
-   "why": "A flat colour must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
+   "why": "A flat color must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
@@ -1653,7 +1653,7 @@
   },
   {
    "name": "black-levels-grbg",
-   "why": "Black level is per mosaic position, not per colour, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
+   "why": "Black level is per mosaic position, not per color, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
@@ -1859,7 +1859,7 @@
   },
   {
    "name": "flat-gbrg",
-   "why": "A flat colour must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
+   "why": "A flat color must survive demosaicing at every pixel, borders included: a wrong pattern index, a wrong origin or a read of the masked border each change some.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
@@ -2271,7 +2271,7 @@
   },
   {
    "name": "black-levels-gbrg",
-   "why": "Black level is per mosaic position, not per colour, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
+   "why": "Black level is per mosaic position, not per color, and indexed in picture coordinates. Getting that wrong leaves a checkerboard on a flat field.",
    "halfSize": false,
    "rawWidth": 13,
    "rawHeight": 11,
