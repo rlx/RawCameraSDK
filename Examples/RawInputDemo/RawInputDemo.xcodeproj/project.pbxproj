@@ -12,6 +12,7 @@
 		5A580E7201B5EEC225011234 /* Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A190F5AA084977D52BA41810 /* Support.swift */; };
 		8165D9936385E3226F21E3F8 /* WalkthroughTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96496F9A35806264BAC47A4D /* WalkthroughTests.swift */; };
 		91829409C0647150F437D8A6 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BAFB2AC0BE43AD6B919BAD6 /* DetailView.swift */; };
+		9886176CCE7711BD9B5EB7A3 /* kernel-cases.json in Resources */ = {isa = PBXBuildFile; fileRef = 075BB86BDF9276ED6A5A386F /* kernel-cases.json */; };
 		9ED9E0B29DD96A018B45E579 /* UnitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D42A21BE610B362FB7B8876 /* UnitTests.swift */; };
 		A1637B190D278BFC7EB63C4C /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE559389E18E21056D588863 /* GalleryView.swift */; };
 		BDD65C23F312F6FB5F63327F /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF7E901BECA9E3F6E091F5F0 /* Fixtures.swift */; };
@@ -45,6 +46,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		075BB86BDF9276ED6A5A386F /* kernel-cases.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "kernel-cases.json"; sourceTree = "<group>"; };
 		07FCD6F407EB09BF8092A662 /* Benchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Benchmark.swift; sourceTree = "<group>"; };
 		0D42A21BE610B362FB7B8876 /* UnitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitTests.swift; sourceTree = "<group>"; };
 		1D955F60E9C3B59DDC506862 /* files */ = {isa = PBXFileReference; lastKnownFileType = folder; name = files; path = Samples/files; sourceTree = SOURCE_ROOT; };
@@ -87,6 +89,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		40162AB02D5EC60CA1CB141A /* Conformance */ = {
+			isa = PBXGroup;
+			children = (
+				075BB86BDF9276ED6A5A386F /* kernel-cases.json */,
+			);
+			name = Conformance;
+			path = ../../Conformance;
+			sourceTree = "<group>";
+		};
 		565242E7AFD8B69F6FF2D694 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -108,6 +119,7 @@
 			children = (
 				1D955F60E9C3B59DDC506862 /* files */,
 				DF10A543A5DDF343E8CD4E94 /* App */,
+				40162AB02D5EC60CA1CB141A /* Conformance */,
 				5B96BD177503306641FAAFFA /* Packages */,
 				C3C43AABC0F76F08C4E3830A /* RawInputKitTests */,
 				FC9883C58D5A825983BFD475 /* Samples */,
@@ -191,6 +203,7 @@
 			buildConfigurationList = 713C684D090865B13256A7AD /* Build configuration list for PBXNativeTarget "RawInputDemoTests" */;
 			buildPhases = (
 				A2B05C12530E7B000F63D3E3 /* Sources */,
+				1A3F72E91746EC2948EE0029 /* Resources */,
 				C3180F5D952297180FE0EAE3 /* Frameworks */,
 			);
 			buildRules = (
@@ -270,6 +283,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1A3F72E91746EC2948EE0029 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9886176CCE7711BD9B5EB7A3 /* kernel-cases.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7741A443B7B95E31CE352535 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;

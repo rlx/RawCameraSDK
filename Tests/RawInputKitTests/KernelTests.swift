@@ -215,8 +215,13 @@ struct ConformanceCase: Decodable, CustomTestStringConvertible {
     }
 
     private static let document: Document? = {
-        let url = Fixtures.root.appending(path: "Conformance/kernel-cases.json")
-        return (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Document.self, from: $0) }
+        // From the repository when there is one; from the test bundle on a device.
+        let inRepository = Fixtures.root.appending(path: "Conformance/kernel-cases.json")
+        let bundled = Bundle.allBundles.lazy.compactMap { $0.url(forResource: "kernel-cases", withExtension: "json") }
+        return ([inRepository] + Array(bundled)).lazy
+            .compactMap { try? Data(contentsOf: $0) }
+            .compactMap { try? JSONDecoder().decode(Document.self, from: $0) }
+            .first
     }()
 
     static var all: [ConformanceCase] { document?.cases ?? [] }
