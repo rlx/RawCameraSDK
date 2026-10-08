@@ -121,7 +121,7 @@ camera to the fallback.
 ### Why there are two fallback paths
 
 LibRaw can do the whole job on the CPU, and for unusual sensors it should: its pipeline
-knows per-camera corrections that took its authors two decades to collect. But it is
+knows per-camera corrections its authors collected camera by camera. But it is
 single-threaded, and seconds per frame where a GPU needs tenths. (The best-known demosaic
 algorithms, AMaZE and RCD, are GPL and are in neither LibRaw's shipped tree nor this
 project.) Plain Bayer sensors are the bulk of real files and need nothing camera-specific

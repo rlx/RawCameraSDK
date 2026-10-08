@@ -18,7 +18,7 @@ Two public facts frame the question.
 So decoding RAW is not new to VSCO. The open question is how RAW reaches the new editor,
 and my guess is that the hard part is the new engine and not the decoder: the data has to
 arrive in the engine's working space, look the same on iOS and macOS, and keep looking the
-same when a photographer reopens an edit next year.
+same when a photographer reopens an edit after an OS update.
 
 ## What I measured
 
@@ -69,22 +69,22 @@ niche: Sigma Foveon, Samsung NX, Phase One in two compression modes, a monochrom
 hacked-firmware dumps. There are exceptions, such as a reduced-size mode of the 2025 Sony
 RX1R III. Whether any of this matters to Studio Pro's users is an empirical question.
 The library reports every file Apple turns away, with camera and compression scheme
-(`RawEvent.appleRejected`). A few weeks of that, with consent, says whether the number is
-0.2% of imports or 5%.
+(`RawEvent.appleRejected`). Collecting that, with consent, says whether the number is 0.2%
+of imports or 5%.
 
 **6. If the count justifies it, the fallback is a bounded project.** This repository is its
-first stage. What remains, as I would plan it:
+first stage. What remains, in the order I would do it:
 
-| Work | My estimate |
-|---|---|
-| Harden the decode boundary: sanitizer-backed fuzzing in CI, detection of truncated uncompressed files, a format allowlist | 2 to 3 weeks |
-| Rendering parity with Apple's route: lens corrections from embedded metadata, noise reduction, highlight handling, a calibrated baseline exposure in place of auto-exposure | 4 to 6 weeks |
-| Wide-gamut output and a path into the engine that does not pass through Core Image | 1 to 2 weeks |
-| Per-camera verification in CI and a process for taking LibRaw updates | 1 to 2 weeks |
+1. Harden the decode boundary: sanitizer-backed fuzzing in CI, detection of truncated
+   uncompressed files, a format allowlist.
+2. Rendering parity with Apple's route: lens corrections from embedded metadata, noise
+   reduction, highlight handling, and a calibrated baseline exposure in place of
+   auto-exposure. This is the largest piece.
+3. Wide-gamut output, and a path into the engine that does not pass through Core Image.
+4. Per-camera verification in CI and a process for taking LibRaw updates.
 
-That is roughly three months for one engineer, plus a continuing cost: each LibRaw release has
-to be re-verified per camera, because LibRaw can decode a new camera wrongly instead of
-refusing it. The licence position (LibRaw under CDDL, statically linked) needs counsel's
+There is also a continuing cost: each LibRaw release has to be re-verified per camera,
+because LibRaw can decode a new camera wrongly instead of refusing it. The licence position (LibRaw under CDDL, statically linked) needs counsel's
 sign-off. Note that CDDL does not forbid patching LibRaw; it requires publishing the
 patched files, so a security fix ahead of upstream is possible.
 
@@ -92,7 +92,7 @@ patched files, so a security fix ahead of upstream is possible.
 
 | Option | Why not, or when |
 |---|---|
-| Write decoders in-house | About 1,300 camera models and twenty years of accumulated quirks. Not a good use of a small team. |
+| Write decoders in-house | About 1,300 camera models, each with its own accumulated quirks. Not a good use of a small team. |
 | RawSpeed | LGPL only, which is awkward to satisfy in a statically linked App Store app, and it decodes without developing. |
 | A Rust decoder (rawler, rawloader) | The natural fit for a Rust engine, and worth a serious look. When I checked they were LGPL and covered fewer cameras than LibRaw; I have not evaluated them beyond that. |
 | Adobe's DNG SDK | Opens DNG only. Useful if VSCO were willing to ask users to convert, which defeats the purpose. |
@@ -120,5 +120,5 @@ need writing again, or porting to the engine's shader language.
 - That the main app's RAW support is built on Apple's decoder. VSCO's FAQ ties it to
   specific iOS devices, which suggests so, but I do not know.
 - That the look matters more to VSCO's users than the last tenth of cameras.
-- That three months of one engineer is available for the fallback if the data asks for it.
+- That there is capacity to build out the fallback if the data asks for it.
 - The timings come from one phone and one Mac. Phones with 4 GB or less are untested.

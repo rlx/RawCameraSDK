@@ -11,7 +11,7 @@ import RawShim
 /// **CPU path**: everything else: X-Trans, Foveon, monochrome sensors, already-demosaiced
 /// files, and Bayer sensors that need corrections only LibRaw knows (Phase One backs, Fuji
 /// SuperCCD). LibRaw's own pipeline develops it, single-threaded. Slow (seconds), but it
-/// encodes twenty years of per-camera knowledge that is not worth reimplementing for
+/// encodes a great deal of per-camera knowledge that is not worth reimplementing for
 /// formats that only reach this code when Apple's decoder has already refused them.
 ///
 /// Both paths produce the same thing: an upright, scene-linear image with sRGB primaries.
