@@ -3,14 +3,13 @@ import CoreText
 import Foundation
 import RawInputKit
 
-/// Lays images out in a captioned grid and writes them as one JPEG: the pictures in the
-/// README that put decoders, or looks, next to each other.
+/// Lays images out in a captioned grid and writes them as one JPEG.
 enum ContactSheet {
     struct Cell {
         enum Framing {
-            /// The whole picture, scaled to the cell's width.
+            /// Scaled to the cell's width.
             case whole
-            /// The middle of the picture at one image pixel per sheet pixel.
+            /// The centre at one image pixel per sheet pixel.
             case centreCrop
         }
 
@@ -45,7 +44,7 @@ enum ContactSheet {
         canvas.fill(CGRect(origin: .zero, size: size))
         canvas.interpolationQuality = .high
 
-        // Core Graphics puts its origin at the bottom-left, so rows are placed from the top down.
+        // Core Graphics has a bottom-left origin, so rows are placed from the top down.
         var top = size.height - gutter
         for row in rows {
             let rowHeight = height(of: row)

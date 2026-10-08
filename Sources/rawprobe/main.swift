@@ -8,9 +8,7 @@
 //   rawprobe render <file> <out.jpg> [apple|fallback]   develop one file as the demo app shows it
 //   rawprobe fuzz <file>... [--iterations N] [--seed S]  decode damaged copies; report crashes
 //
-// `one`, `bench-one` and `fuzz-one` are the child-process halves of their commands and
-// are not meant to be run by hand. Each command lives in its own file; this one only parses
-// arguments and dispatches.
+// `one`, `bench-one` and `fuzz-one` are the child-process halves of their commands.
 
 import Foundation
 import RawInputKit

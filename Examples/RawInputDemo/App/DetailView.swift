@@ -1,8 +1,7 @@
 import RawInputKit
 import SwiftUI
 
-/// One file, developed. The decoder picker is the point of the demo: the same file through
-/// Apple's decoder and through the fallback, switchable in place.
+/// One file, developed, with a picker to switch between Apple's decoder and the fallback.
 struct DetailView: View {
     let item: RawItem
 
@@ -21,8 +20,8 @@ struct DetailView: View {
         }
     }
 
-    /// What happens after the decoder. "Decoder" shows each decoder's own output, which is
-    /// where the two visibly differ; the other two put both through the same `RawLook`.
+    /// What happens after the decoder. "Decoder" shows each decoder's own output. The other
+    /// two put both through the same `RawLook`.
     private enum Rendering: String, CaseIterable, Identifiable {
         case decoder = "Decoder"
         case neutral = "Neutral"
@@ -45,7 +44,7 @@ struct DetailView: View {
     }
 
     // `-route Apple` or `-route Fallback` and `-look Neutral` or `-look Film` on the command
-    // line pick the starting state; with `-openSample` (see GalleryView) they script a screenshot.
+    // line pick the starting state. With `-openSample` (see GalleryView) they script a screenshot.
     @State private var choice = UserDefaults.standard.string(forKey: "route").flatMap(Choice.init) ?? .automatic
     @State private var rendering = UserDefaults.standard.string(forKey: "look").flatMap(Rendering.init) ?? .decoder
     @State private var model = DetailModel()
@@ -79,7 +78,7 @@ struct DetailView: View {
                 Image(decorative: image, scale: 1)
                     .resizable()
                     .scaledToFit()
-                    // The camera's embedded preview stands in, dimmed, until the decode lands.
+                    // The embedded preview stands in, dimmed, until the decode lands.
                     .opacity(model.rendered == nil ? 0.6 : 1)
             }
             if model.rendered == nil, model.failure == nil {
@@ -116,8 +115,7 @@ struct DetailView: View {
                 }
                 Text(metadata(raw.info)).font(.caption).foregroundStyle(.secondary)
                 if raw.isColorSuspect {
-                    // The fallback compared its result with the camera's embedded preview
-                    // and they disagree; see RawImage.isColorSuspect.
+                    // The fallback's result disagrees with the embedded preview. See RawImage.isColorSuspect.
                     Label("Colours may be off: they differ from the camera's own preview.", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
@@ -141,8 +139,8 @@ struct DetailView: View {
         let size = "\(Int(raw.image.extent.width)) x \(Int(raw.image.extent.height))"
         let time = model.openSeconds.formatted(.number.precision(.fractionLength(2)))
         let half = raw.isHalfSize ? " (half size)" : ""
-        // "open" and not "decode": Apple's decoder defers its work to render time, so the
-        // figure is only comparable between fallback paths.
+        // Labelled "open": Apple's decoder defers its work to render time, so the figure is
+        // only comparable between fallback paths.
         return "\(size)\(half) · open \(time) s · \(Int(model.memoryMB)) MB"
     }
 

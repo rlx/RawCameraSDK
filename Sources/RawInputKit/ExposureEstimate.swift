@@ -1,31 +1,24 @@
 import CoreImage
 import Foundation
 
-/// Picks a default brightness for a scene-linear image.
-///
-/// Sensor data normalised to its white level looks dark: cameras expose to protect
-/// highlights and rely on a tone curve to lift the rest. The fallback applies no tone
-/// curve, so it reports the exposure that would put the brightest 1% of the frame just
-/// under white and leaves applying it to the caller. That is the rule dcraw-derived viewers
-/// use for their default brightness, and it is predictable: it never clips more than 1% of
-/// the picture and never darkens it.
+/// Picks a default brightness for a scene-linear image: the exposure that puts the
+/// brightest 1% of the frame just under white. It never darkens the picture.
 struct ExposureEstimate {
     private var bins = [Int](repeating: 0, count: 1024)
     private var count = 0
 
-    /// Records one sample: any channel value, with 1 meaning sensor white. Values that are
-    /// not finite are ignored; they can only come from a malformed file, and converting one
-    /// to an integer would trap.
+    /// Records one channel value, with 1 meaning sensor white. Non-finite values are
+    /// ignored, since converting one to an integer would trap.
     mutating func add(_ value: Float) {
         guard value.isFinite else { return }
         bins[Int(min(max(value, 0), 1) * 1023)] += 1
         count += 1
     }
 
-    /// The value below which `fraction` of the samples fall; 0 with no samples.
+    /// The value below which `fraction` of the samples fall, or 0 with no samples.
     func percentile(_ fraction: Double) -> Float {
         guard count > 0 else { return 0 }
-        // The rank of the sample that sits at `fraction`, counting from one.
+        // One-based.
         let rank = max(1, Int((Double(count) * fraction).rounded(.up)))
         var seen = 0
         for (index, bin) in bins.enumerated() {
@@ -43,23 +36,12 @@ struct ExposureEstimate {
         return Double(log2(min(max(0.9 / bright, 1), 16)))
     }
 
-    /// The suggested exposure for a linear image, measured from a small render of it.
+    /// The suggested exposure for a linear image, measured from a render at most 384 pixels
+    /// on its long edge, which averages away single hot pixels.
     ///
-    /// Both decoders' output goes through this one function, and that is the point. The
-    /// shared rendering step can only make two decoders' pictures match if their default
-    /// brightness is decided the same way, from the same kind of evidence. Measuring each
-    /// decoder's data with its own method (sensor samples for one, rendered pixels for the
-    /// other) left the two visibly further apart.
-    ///
-    /// The image is reduced to at most 384 pixels on its long edge first. That is plenty for
-    /// a percentile and averages away single hot pixels that would otherwise set the
-    /// white point.
-    ///
-    /// This is automatic exposure per picture, and it has the usual drawback: it removes
-    /// the photographer's intent from a dark frame, and it makes the frames of
-    /// a bracketed series come out alike. It is a default for viewing, exposed as
-    /// `suggestedExposureEV` so a caller can ignore it. A product would use a calibrated
-    /// baseline per camera and leave the picture's own exposure alone.
+    /// Both decoders' output is measured here so their default brightness matches. As
+    /// per-picture automatic exposure it brightens dark frames and makes a bracketed
+    /// series come out alike.
     static func measure(_ image: CIImage) -> Double {
         let extent = image.extent
         guard !extent.isEmpty, !extent.isInfinite else { return 0 }

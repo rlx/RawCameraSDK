@@ -5,8 +5,8 @@
     corpus.py fetch                  download and SHA-256 verify the pool into Tests/Corpus (19 GB)
     corpus.py fetch --only A B ...   only files whose name contains one of the given strings
 
-The pool is wider than what ends up in the demo app: it is what
-`rawprobe` runs over to find out which files Apple's decoder rejects.
+The pool is wider than the demo app's samples. `rawprobe` runs over it to find the files
+Apple's decoder rejects.
 """
 import hashlib
 import json
@@ -34,7 +34,7 @@ RULES = [
     ("Nikon", r"Z6_3|Z5_2|Z50_2", r"3:2", r"", 3),
     ("Fujifilm", r"X-E5|X-T30 III|X-M5|X-T50|X100VI|GFX100RF", r"", r"", 3),
     ("Panasonic", r"DC-S1RM2|DC-S1M2$|DC-S9|DC-GH7|DC-S5M2|DC-G97", r"", r"", 2),
-    # OM files all carry the same mode label; High Res Shot only shows up as a larger file.
+    # OM files all carry the same mode label. High Res Shot only shows up as a larger file.
     ("OM System", r"OM-1 Mark II|OM-3", r"", r"", 5, False),
     # Compression modes and reduced-size RAW.
     ("Sony", r"ILCE-7CR|ILCE-7RM5", r"compress", r"", 4),
@@ -98,7 +98,7 @@ def build_pool():
                 continue
             groups.setdefault(e["model"], []).append(e)
         for group in groups.values():
-            # Smallest first, but never two files of the same mode and extension.
+            # Smallest first, one file per mode and extension.
             seen = set()
             for e in sorted(group, key=lambda e: e["mb"]):
                 key = (e["mode"], e["name"].rsplit(".", 1)[-1].lower()) if distinct else e["sha256"]
@@ -106,8 +106,7 @@ def build_pool():
                     continue
                 seen.add(key)
                 chosen[e["sha256"]] = e
-    # Sweep: the smallest file of every other camera in the archive, so the probe
-    # answers "which cameras" as well as "which modes".
+    # Sweep: the smallest file of every other camera in the archive.
     covered = {(e["make"], e["model"]) for e in chosen.values()}
     smallest = {}
     for e in entries:

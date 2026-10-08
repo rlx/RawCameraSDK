@@ -1,18 +1,14 @@
-// Develops a Bayer mosaic into scene-linear RGB. The WGSL edition of the kernel, for wgpu
-// (native) and WebGPU (browsers). The Metal edition is in
-// Sources/RawInputKit/MetalDevelop.swift; the two are the same algorithm, and both are
+// Develops a Bayer mosaic into scene-linear RGB. WGSL edition, for wgpu and WebGPU.
+// Same algorithm as the Metal edition in Sources/RawInputKit/MetalDevelop.swift. Both are
 // checked against Conformance/kernel-cases.json.
 //
-// Per output pixel:
-//   raw sample -> subtract black -> normalise to white -> white balance -> clip
-//              -> demosaic (interpolate the two missing colours)
-//              -> 3x3 matrix: camera RGB -> linear sRGB
+// Per output pixel: subtract black, normalise to white, white balance, clip, demosaic,
+// then a 3x3 matrix from camera RGB to linear sRGB.
 //
-// Coordinates: the mosaic texture holds the whole raw plane, masked borders included. The
-// kernel works in picture coordinates, (0, 0) at the top-left of the visible area, and adds
-// `origin` only when it reads the texture.
+// The mosaic texture holds the whole raw plane. The kernel works in picture coordinates,
+// (0, 0) at the top-left of the visible area, and adds `origin` when it reads the texture.
 
-// The uniform block is `rik_develop_params` from RawShim.h, byte for byte (128 bytes).
+// `rik_develop_params` from RawShim.h, byte for byte (128 bytes).
 struct Params {
     black: vec4f,     // per mosaic position: (row & 1) * 2 + (column & 1)
     wb: vec4f,        // per colour; the smallest multiplier is 1
@@ -37,16 +33,9 @@ fn position(p: vec2i) -> u32 {
     return u32(p.y & 1) * 2u + u32(p.x & 1);
 }
 
-// One sensor sample, ready to interpolate: black subtracted, scaled so that sensor white is
-// 1, and white-balanced.
-//
-// Coordinates outside the picture are mirrored about the edge pixel. Mirroring moves a
-// coordinate by an even distance, so the reflected sample has the same colour as the one
-// asked for and the interpolation needs no special cases at the border.
-//
-// The clip to 1 comes after white balance on purpose: a blown highlight saturates all three
-// channels at sensor white, white balance then scales red and blue past green, and without
-// the clip the highlight would turn magenta.
+// One sensor sample: black subtracted, scaled so sensor white is 1, white-balanced.
+// Coordinates outside the picture are mirrored about the edge pixel, which keeps the colour.
+// The clip to 1 must follow white balance, or blown highlights turn magenta.
 fn value(at: vec2i) -> f32 {
     let last = vec2i(params.size) - 1;
     var p = abs(at);
@@ -58,9 +47,8 @@ fn value(at: vec2i) -> f32 {
     return min(max(v, 0.0) * params.wb[params.pattern[pos]], 1.0);
 }
 
-// Green at any pixel. At a green site it is the sample itself. At a red or blue site it is
-// interpolated along the direction, horizontal or vertical, in which the image changes
-// least (Hamilton-Adams), corrected by the curvature of the colour that is sampled here.
+// Green at any pixel. At a red or blue site it is interpolated along the direction of least
+// change (Hamilton-Adams), corrected by the curvature of the colour sampled there.
 fn green(p: vec2i) -> f32 {
     let c = value(p);
     if (params.pattern[position(p)] == 1u) {
@@ -87,9 +75,8 @@ fn green(p: vec2i) -> f32 {
     return max(g, 0.0);
 }
 
-// Red or blue minus green, at a red or blue site. Colour differences change far more slowly
-// across an image than the colours themselves, so averaging them is safe where averaging
-// raw red or blue would blur and fringe.
+// Red or blue minus green, at a red or blue site. Colour differences vary slowly, so they
+// are safe to average.
 fn chroma(p: vec2i) -> f32 {
     return value(p) - green(p);
 }
@@ -111,8 +98,8 @@ fn develop_full(@builtin(global_invocation_id) id: vec3u) {
     var camera = vec3f(0.0, g, 0.0);
 
     if (color == 1u) {
-        // A green site has one of red/blue to its left and right and the other above and
-        // below. `2 - colour` turns red (0) into blue (2) and back.
+        // One of red/blue is left and right, the other above and below.
+        // `2 - colour` swaps red (0) and blue (2).
         let horizontal = (chroma(p + vec2i(-1, 0)) + chroma(p + vec2i(1, 0))) * 0.5;
         let vertical = (chroma(p + vec2i(0, -1)) + chroma(p + vec2i(0, 1))) * 0.5;
         let horizontal_color = params.pattern[position(p + vec2i(1, 0))];

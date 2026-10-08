@@ -6,11 +6,8 @@ import Testing
 import simd
 @testable import RawInputKit
 
-/// The ten bundled files that only the fallback opens. Together they are the claim the
-/// project makes: Apple's decoder cannot open these, and the fallback can.
-///
-/// With no sample files at all the suite is skipped, with the command that fetches them;
-/// with some but not all, `allTenArePresent` fails, because a partial set is a mistake.
+/// The ten bundled files that only the fallback opens.
+/// Skipped when no samples are present. A partial set fails `allTenArePresent`.
 @Suite("Bundled samples", .enabled(if: !Fixtures.samples.isEmpty, "run Examples/RawInputDemo/Scripts/fetch-samples.sh"))
 struct SampleTests {
     @Test func allTenArePresent() {
@@ -23,8 +20,8 @@ struct SampleTests {
         #expect(digest.map { String(format: "%02x", $0) }.joined() == sample.sha256)
     }
 
-    /// If this starts failing after an OS update, Apple has added support for the format.
-    /// That is good news: replace the sample and update the README's numbers.
+    /// Fails when an OS update adds Apple support for the format.
+    /// Replace the sample and update the README's numbers.
     @Test(arguments: Fixtures.samples)
     func appleRejectsIt(_ sample: Fixtures.Sample) {
         #expect(!RawInput.appleCanDecode(sample.url))
@@ -39,15 +36,14 @@ struct SampleTests {
         #expect(raw.route == .fallback)
         #expect(!raw.isHalfSize)
 
-        // `info` describes the unrotated frame; the image has the orientation applied.
+        // `info` describes the unrotated frame. The image has the orientation applied.
         let sideways = [.left, .right, .leftMirrored, .rightMirrored].contains(raw.info.orientation)
         let expected = sideways
             ? CGSize(width: raw.info.height, height: raw.info.width)
             : CGSize(width: raw.info.width, height: raw.info.height)
         #expect(raw.image.extent.size == expected)
 
-        // The fallback checks its own colours against the camera's preview. None of the
-        // samples should trip it; a regression in levels or white balance would.
+        // A regression in levels or white balance would trip the preview check.
         let distance = try #require(raw.previewDistance, "every sample has an embedded preview")
         #expect(distance < RawImage.suspectPreviewDistance)
         #expect(!raw.isColorSuspect)
@@ -70,8 +66,7 @@ struct SampleTests {
         #expect(min(preview.width, preview.height) > 32)
     }
 
-    /// Testing whether Apple supports a file costs a good part of a decode, so a "yes" is
-    /// kept per camera and mode. Two different cameras must still be tested separately.
+    /// A "yes" is cached per camera and mode.
     @Test func appleSupportIsRememberedPerKindOfFile() throws {
         try #require(Fixtures.samples.count >= 2)
         final class Log: @unchecked Sendable {
@@ -93,8 +88,7 @@ struct SampleTests {
         #expect(tested.all == [first, second])
     }
 
-    /// A "no" may be about one damaged file, not its camera. Remembering it would send every
-    /// later file from that camera to the fallback, so each failure is tested afresh.
+    /// A "no" may come from one damaged file, so it is never cached.
     @Test func appleRejectionIsNotRemembered() throws {
         let file = try #require(Fixtures.samples.first).url
         final class Answers: @unchecked Sendable {
@@ -121,8 +115,7 @@ struct SampleTests {
         options.eventHandler = { log.append($0) }
         let raw = try RawInput.open(sample.url, options: options)
 
-        // First the routing decision, last the summary; this is what an app would log to
-        // learn how often, and for which cameras, Apple's decoder turns files away.
+        // Routing decision first, summary last.
         guard case .appleRejected(let camera, _) = try #require(log.all.first) else {
             Issue.record("expected the rejection first, got \(log.all)")
             return
@@ -143,8 +136,7 @@ struct SampleTests {
         #expect(throws: RawError.cancelled) { try RawInput.open(sample.url, options: options) }
     }
 
-    /// The frame size comes from the file, so the limit is what stands between a crafted
-    /// header and an allocation of whatever it asks for.
+    /// The frame size comes from the file, so a crafted header can ask for any allocation.
     @Test func memoryLimitRefusesAFrameThatWouldExceedIt() throws {
         let sample = try #require(Fixtures.samples.first)
         var options = RawDecodeOptions()
@@ -153,7 +145,7 @@ struct SampleTests {
         #expect(throws: RawError.exceedsMemoryLimit) { try RawInput.open(sample.url, options: options) }
     }
 
-    /// "No limit" has to mean that, on both paths, including the arithmetic.
+    /// `.max` means no limit on both paths, including in the arithmetic.
     @Test(arguments: Fixtures.samples)
     func anUnlimitedMemoryLimitIsAccepted(_ sample: Fixtures.Sample) throws {
         var options = RawDecodeOptions()
@@ -168,7 +160,6 @@ struct SampleTests {
         #expect(raw.decoder.contains(raw.fallbackPath == .gpu ? "Metal" : "CPU"))
     }
 
-    /// A grid of thumbnails and a detail view decode at the same time in any real app.
     @Test func decodesInParallel() async throws {
         let urls = Fixtures.samples.map(\.url)
         try #require(!urls.isEmpty)
@@ -185,9 +176,8 @@ struct SampleTests {
     }
 }
 
-/// The two decoders on a file both can open. They are not expected to look alike (Apple
-/// applies a tone curve and the fallback does not), but they must agree on what the picture
-/// is: its size, and the colour of things in it.
+/// The two decoders on a file both can open. Apple applies a tone curve and the fallback
+/// does not, so only size and colour are compared.
 @Suite("Decoder agreement", .enabled(if: Fixtures.reference != nil, Fixtures.fetchHint))
 struct AgreementTests {
     let url = Fixtures.reference!
@@ -206,13 +196,12 @@ struct AgreementTests {
 
     @Test func routesAgreeOnSize() throws {
         let apple = try open(url, .apple), fallback = try open(url, .fallback)
-        // Decoders trim sensor borders slightly differently; a few pixels is normal.
+        // Decoders trim sensor borders differently by a few pixels.
         #expect(abs(apple.image.extent.width - fallback.image.extent.width) <= 16)
         #expect(abs(apple.image.extent.height - fallback.image.extent.height) <= 16)
     }
 
-    /// Chromaticity, not brightness: white balance and the colour matrix have to land both
-    /// decoders on nearly the same hue even though their tone curves differ.
+    /// Compares chromaticity because the tone curves differ.
     @Test func routesAgreeOnColor() throws {
         let apple = chromaticity(centreColor(try open(url, .apple).image))
         let fallback = chromaticity(centreColor(try open(url, .fallback).image))
@@ -236,15 +225,14 @@ struct AgreementTests {
     }
 
     @Test func displayImageIsClippedOnBothRoutes() throws {
-        // Apple's image can carry highlights above 1; `displayImage` promises not to.
+        // Apple's image can carry highlights above 1.
         for routing in [RawDecodeOptions.Routing.apple, .fallback] {
             let display = try open(url, routing).displayImage(exposureEV: 6)
             #expect(centreColor(display).max() <= 1.001)
         }
     }
 
-    /// The point of the shared rendering step: scene-linear data from either decoder,
-    /// taken through the same look, should be the same picture. Their own outputs are not.
+    /// Scene-linear data from either decoder, taken through the same look, should match.
     @Test func sharedRenderingBringsTheRoutesTogether() throws {
         var options = RawDecodeOptions()
         options.routing = .apple
@@ -263,7 +251,6 @@ struct AgreementTests {
         #expect(shared < 0.03)
     }
 
-    /// An engine that renders with Metal takes a texture, not a `CIImage`.
     @Test(arguments: [RawDecodeOptions.Routing.apple, .fallback])
     func rendersIntoAMetalTexture(_ routing: RawDecodeOptions.Routing) throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
@@ -274,7 +261,7 @@ struct AgreementTests {
         #expect(texture.width == Int(raw.image.extent.width) && texture.height == Int(raw.image.extent.height))
         #expect(texture.pixelFormat == .rgba16Float)
 
-        // Same values as the image, and the right way up: compare the top-left corner.
+        // The top-left corner checks both the values and which way is up.
         let fromTexture = try #require(CIImage(mtlTexture: texture, options: [
             .colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
         ])).oriented(.downMirrored)
@@ -284,8 +271,7 @@ struct AgreementTests {
         #expect(simd_distance(expected, actual) < 0.01)
     }
 
-    /// The in-camera crop lives in metadata; the sensor data is the full 3:2 frame. A
-    /// decoder that ignores it returns a different picture from the one the photographer took.
+    /// The in-camera crop lives in metadata. The sensor data is the full 3:2 frame.
     @Test(.enabled(if: Fixtures.cropped != nil, Fixtures.fetchHint))
     func fallbackHonorsInCameraCrop() throws {
         let file = try #require(Fixtures.cropped)

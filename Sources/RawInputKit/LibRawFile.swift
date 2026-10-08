@@ -3,18 +3,15 @@ import RawShim
 
 /// A file opened by LibRaw, through the C shim.
 ///
-/// The shim hands out pointers into buffers the LibRaw handle owns. Swift is free to
-/// destroy an object after its last *use*, which can be earlier than the end of its scope,
-/// so "the buffer lives as long as this object" is not a contract a caller can lean on.
-/// Buffers are therefore only ever exposed inside a closure, during which this object is
-/// pinned alive. Copy out whatever must outlast the closure.
+/// Buffers belong to the LibRaw handle and are exposed only inside a closure, which keeps
+/// this object alive. Copy out whatever must outlast the closure.
 ///
-/// Not thread-safe: use an instance from one thread. Separate instances are independent.
+/// Not thread-safe. Separate instances are independent.
 final class LibRawFile {
     private let handle: OpaquePointer
     private var cancellation: Cancellation?
 
-    /// Parses the container and metadata. Cheap; no sensor data is read.
+    /// Parses the container and metadata. No sensor data is read.
     init(_ url: URL) throws {
         var handle: OpaquePointer?
         let code = url.withUnsafeFileSystemRepresentation { rik_open($0, &handle) }
@@ -24,8 +21,7 @@ final class LibRawFile {
 
     deinit { rik_close(handle) }
 
-    /// A snapshot of the shim's view of the file. Geometry, levels and colour fields are
-    /// only meaningful after `unpack()`.
+    /// Geometry, levels and colour fields are only meaningful after `unpack()`.
     var info: rik_info {
         var info = rik_info()
         rik_get_info(handle, &info)
@@ -46,15 +42,13 @@ final class LibRawFile {
         }, Unmanaged.passUnretained(box).toOpaque())
     }
 
-    /// Decompresses the sensor data: the expensive step, from tens of milliseconds to
-    /// several seconds depending on the format.
+    /// Decompresses the sensor data. Takes tens of milliseconds to several seconds.
     func unpack() throws {
         let code = rik_unpack(handle)
         guard code == 0 else { throw Self.error(code) }
     }
 
-    /// What the GPU kernel needs to develop the mosaic, or `nil` if the file is not a plain
-    /// Bayer mosaic. Computed by the core, so every binding develops with the same numbers.
+    /// The GPU kernel's inputs, or `nil` if the file is not a plain Bayer mosaic.
     var developParameters: rik_develop_params? {
         var parameters = rik_develop_params()
         return rik_get_develop_params(handle, &parameters) == 0 ? parameters : nil
@@ -71,7 +65,7 @@ final class LibRawFile {
         }
     }
 
-    /// LibRaw's CPU development of the file: linear 16-bit RGB or grey, not rotated.
+    /// LibRaw's CPU development: linear 16-bit RGB or grey, unrotated.
     func withDeveloped<Result>(halfSize: Bool, _ body: (rik_rgb16) throws -> Result) throws -> Result {
         try withExtendedLifetime(self) {
             var image = rik_rgb16()
@@ -100,7 +94,7 @@ final class LibRawFile {
     }
 }
 
-/// Carries the caller's cancellation closure across the C boundary as a context pointer.
+/// Boxes the cancellation closure for use as a C context pointer.
 private final class Cancellation {
     let isCancelled: @Sendable () -> Bool
     init(_ isCancelled: @escaping @Sendable () -> Bool) { self.isCancelled = isCancelled }

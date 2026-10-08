@@ -9,7 +9,7 @@ struct ExposureEstimateTests {
     @Test func liftsBrightestPercentToJustUnderWhite() {
         var estimate = ExposureEstimate()
         for _ in 0..<1000 { estimate.add(0.225) }
-        // 0.9 / 0.225 is a factor of four: two stops.
+        // 0.9 / 0.225 is a factor of four, or two stops.
         #expect(abs(estimate.suggestedEV - 2) < 0.02)
     }
 
@@ -32,8 +32,8 @@ struct ExposureEstimateTests {
         #expect(black.suggestedEV == 0)
     }
 
-    /// A file whose white level equals its black level makes every sample 0/0. Converting
-    /// that to an integer would crash the process, on input an attacker controls.
+    /// A file whose white level equals its black level makes every sample 0/0, which
+    /// would crash on conversion to an integer.
     @Test func ignoresNonFiniteSamples() {
         var estimate = ExposureEstimate()
         estimate.add(.nan)
@@ -47,7 +47,7 @@ struct ExposureEstimateTests {
 
 @Suite("Preview agreement")
 struct PreviewAgreementTests {
-    /// A flat mid-grey card with a coloured patch, as a stand-in for a photograph.
+    /// A flat mid-grey card with a coloured patch.
     private func picture(tint: CIColor? = nil) -> CIImage {
         let frame = CGRect(x: 0, y: 0, width: 240, height: 160)
         let grey = CIImage(color: CIColor(red: 0.4, green: 0.4, blue: 0.4)).cropped(to: frame)
@@ -69,22 +69,21 @@ struct PreviewAgreementTests {
         #expect(try distance(picture(), from: picture()) < 0.01)
     }
 
-    /// The camera's preview has its own brightness and contrast; only hue is evidence.
+    /// The camera's preview has its own brightness and contrast, so only hue counts.
     @Test func brightnessAloneIsNotDisagreement() throws {
-        // About two thirds of a stop darker. (Near black the measure loses
-        // interest, since hue there is mostly noise, so the test stays out of the shadows.)
+        // About two thirds of a stop darker. The measure discounts near-black pixels.
         let darker = picture(tint: CIColor(red: 0.8, green: 0.8, blue: 0.8))
         #expect(try distance(darker, from: picture()) < 0.03)
     }
 
-    /// What a wrong black level or white balance looks like: a cast over the whole frame.
+    /// A wrong black level or white balance casts the whole frame.
     @Test func colorCastIsFlagged() throws {
         let pink = picture(tint: CIColor(red: 1, green: 0.55, blue: 0.8))
         #expect(try distance(pink, from: picture()) > RawImage.suspectPreviewDistance)
     }
 
     @Test func upsideDownPictureIsFlagged() throws {
-        // Top half bright red, bottom half blue: unmistakable once flipped.
+        // Top half bright red, bottom half blue.
         let frame = CGRect(x: 0, y: 0, width: 240, height: 160)
         let red = CIImage(color: CIColor(red: 0.8, green: 0.1, blue: 0.1)).cropped(to: frame)
         let blue = CIImage(color: CIColor(red: 0.1, green: 0.1, blue: 0.8))
@@ -121,7 +120,7 @@ struct RobustnessTests {
         return url
     }
 
-    /// Every entry point refuses the file, with an error and without crashing.
+    /// Every entry point throws for the file.
     private func expectRejected(_ url: URL) {
         #expect(!RawInput.appleCanDecode(url))
         for routing in [RawDecodeOptions.Routing.automatic, .apple, .fallback] {
@@ -146,7 +145,7 @@ struct RobustnessTests {
     }
 
     @Test func randomBytes() throws {
-        // A fixed seed: a failure has to be reproducible to be worth anything.
+        // Fixed seed, so a failure is reproducible.
         var state: UInt64 = 0x5EED
         let bytes = (0..<65_536).map { _ -> UInt8 in
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -157,9 +156,8 @@ struct RobustnessTests {
         expectRejected(url)
     }
 
-    /// A card pulled mid-copy: the header parses, then the sensor data runs out. Decoders
-    /// differ in whether they notice, so the only firm requirement is not crashing; a
-    /// file that does decode must at least produce a real image.
+    /// The header parses, then the sensor data runs out. Decoders differ in whether they
+    /// notice, so a decode that succeeds only has to give a non-empty image.
     @Test(arguments: Fixtures.samples)
     func truncatedFileDoesNotCrash(_ sample: Fixtures.Sample) throws {
         let data = try Data(contentsOf: sample.url, options: .mappedIfSafe)

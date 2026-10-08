@@ -1,8 +1,6 @@
 // Runs the WebAssembly build under Node against the demo's sample files:
 //
 //     node Bindings/web/test.mjs
-//
-// The same module runs in a browser; Node is used here because it needs no page.
 
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

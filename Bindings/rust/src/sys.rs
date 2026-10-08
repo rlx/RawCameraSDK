@@ -1,8 +1,7 @@
 //! The C interface, declared by hand from `Sources/RawShim/include/RawShim.h`.
 //!
-//! It is small enough that a generator would add a build dependency for little gain. The
-//! cost is that a change to the header has to be made here too; `ABI_VERSION` and the size
-//! assertions below are what catch a mismatch.
+//! Header changes must be repeated here. `ABI_VERSION` and the size assertions catch a
+//! mismatch.
 
 use std::ffi::{c_char, c_int, c_void};
 

@@ -1,26 +1,19 @@
 import CoreImage
 import simd
 
-/// An image averaged down to a coarse grid of colours: the common ground for comparing two
-/// renderings of the same picture that differ in size, sharpness or noise.
-///
-/// Public only to this package's measuring tools (`@_spi(Measurement)`), which compare
-/// decoders with it. It is not part of the library's supported API.
+/// An image averaged down to a coarse grid of colours, for comparing two renderings of the
+/// same picture. Not part of the supported API.
 @_spi(Measurement)
 public enum ColorGrid {
     public static let columns = 24, rows = 16
 
-    /// Linear sRGB colours, row by row from the top.
-    ///
-    /// The image is stretched to the grid whatever its aspect ratio, so two renderings with
-    /// different framing or rotation land different content in each cell and compare badly.
-    /// That is intended: it makes a geometry mistake visible as a colour difference.
+    /// Linear sRGB colours, row by row from the top, or `nil` for an empty or infinite image.
+    /// The image is stretched to the grid whatever its aspect ratio.
     public static func colors(of image: CIImage, context: CIContext) -> [SIMD3<Float>]? {
         let extent = image.extent
         guard !extent.isEmpty, !extent.isInfinite else { return nil }
         let scale = CGFloat(rows) / extent.height
-        // Lanczos averages over the source area; a plain affine downscale by this much
-        // would sample single pixels and turn noise into colour error.
+        // Lanczos averages over the source area. An affine downscale would sample single pixels.
         let scaled = image
             .transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
             .applyingFilter("CILanczosScaleTransform", parameters: [
@@ -36,24 +29,12 @@ public enum ColorGrid {
     }
 }
 
-/// Checks a developed image against the only reference every RAW file carries: the preview
-/// its own camera rendered.
+/// Checks a developed image against the camera's embedded preview.
 ///
-/// "The decoder returned pixels" says nothing about whether they are right. A wrong black
-/// level, white balance, colour matrix, crop or rotation all still produce a picture, and
-/// LibRaw produces exactly such pictures for cameras newer than its tables. Comparing with
-/// the embedded preview catches them.
-///
-/// Only chromaticity is compared (the proportions of red, green and blue), not brightness,
-/// because the camera's preview has a tone curve and a picture style that a neutral decode
-/// lacks by design. The result is the mean distance over the grid:
-///
-///     below 0.05   the usual range for a correct decode
-///     above 0.15   suspect: worth looking at the picture
-///
-/// It is a screening tool, not a colour-accuracy metric. A vivid picture style in the
-/// camera raises it for a perfectly good decode, and across 944 test files about one
-/// correct decode in a hundred lands above the threshold for that reason.
+/// Only chromaticity is compared, because the preview has a tone curve. The result is the
+/// mean distance over the grid: below 0.05 is usual for a correct decode, above 0.15 is
+/// suspect. A vivid picture style raises it. Across 944 test files about one correct
+/// decode in a hundred lands above the threshold.
 enum PreviewAgreement {
     static func distance(_ image: CIImage, preview: CGImage, context: CIContext = RenderContext.shared) -> Double? {
         guard let developed = ColorGrid.colors(of: image, context: context),
@@ -67,8 +48,7 @@ enum PreviewAgreement {
         return distance.isFinite ? distance : nil
     }
 
-    /// Red and green as fractions of the total. The small constant keeps near-black cells,
-    /// where the ratio is mostly noise, from dominating.
+    /// Red and green as fractions of the total. The constant damps near-black cells.
     private static func chromaticity(_ color: SIMD3<Float>) -> SIMD2<Float> {
         let clamped = simd_max(color, SIMD3(repeating: 0))
         return SIMD2(clamped.x, clamped.y) / (clamped.sum() + 0.02)

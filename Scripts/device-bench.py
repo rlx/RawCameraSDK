@@ -4,31 +4,20 @@
     Scripts/device-bench.py <device-udid> [--limit 15] [--runs 1]
     Scripts/device-bench.py <device-udid> --limit 0 --runs 3     the full set: 102 launches
 
-Before running, build and install the demo app on the device (README, "On a device").
+Build and install the demo app on the device first (README, "On a device").
 `xcrun devicectl list devices` shows the UDID.
 
-Two sets of files are measured:
+Measures the ten bundled samples, which only the fallback opens, and the files from the
+Mac benchmark (Tests/bench-results.json), which both decoders open. Each measurement is
+one launch of the app in its headless benchmark mode (Examples/RawInputDemo/App/Benchmark.swift).
+The default is 15 launches, one run each, in this order:
 
-  - the ten samples bundled in the app, which only the fallback opens;
-  - the files from the Mac benchmark (Tests/bench-results.json), which both decoders open.
-    They are copied from Tests/Corpus into the app's Documents folder first.
-
-Each measurement is one launch of the app in its headless benchmark mode (see
-Examples/RawInputDemo/App/Benchmark.swift), so every run has its own process and its own
-peak-memory figure, and a run the OS terminates for memory shows up as exactly that.
-
-Every launch brings the app to the front of the phone for a moment, so the default is a
-short session: at most 15 launches, one run each. Measurements are taken in order of how
-much they tell you, and the list is cut where the limit falls:
-
-  1. the shared files through Apple's decoder asked for scene-linear output, and through
-     the fallback                             (the comparison a caller doing its own rendering needs)
+  1. the shared files through Apple's decoder with scene-linear output, and the fallback
   2. the shared files through Apple's decoder at its default rendering
-  3. the samples through the fallback         (the formats Apple cannot open)
-  4. the samples through Apple's decoder      (confirms it still rejects them)
+  3. the samples through the fallback
+  4. the samples through Apple's decoder
 
 `--limit 0` removes the cap. The figures in the README came from `--limit 0 --runs 3`.
-
 Writes Tests/device-results.json: one row per file and route, the median of the runs.
 Rows a limited session does not reach are carried over from the previous results.
 """
@@ -61,8 +50,7 @@ def copy_to_documents(device, source, name):
 
 def launch(device, name, route):
     """One measurement. Returns the app's result, or a row saying why there is none."""
-    # A locked phone refuses to launch anything. That says nothing about the decoder, so
-    # wait for it to be unlocked instead of recording a failure.
+    # A locked phone refuses to launch anything. Wait for it to be unlocked.
     for attempt in range(24):
         try:
             result = devicectl(
@@ -78,7 +66,7 @@ def launch(device, name, route):
     for line in result.stdout.splitlines():
         if line.startswith(MARKER):
             return json.loads(line[len(MARKER):])
-    # No result line: the process died first. On iOS that is almost always the memory limit.
+    # No result line: the process died first, on iOS usually at the memory limit.
     tail = (result.stdout + result.stderr).strip().splitlines()[-1:] or ["no output"]
     return {"file": name, "route": route, "error": f"terminated before finishing ({tail[0]})"}
 
@@ -86,7 +74,7 @@ def launch(device, name, route):
 def measure(device, name, route, runs):
     samples = [launch(device, name, route) for _ in range(runs)]
     finished = sorted((s for s in samples if s.get("totalSeconds")), key=lambda s: s["totalSeconds"])
-    # A file Apple cannot open fails identically every time; any one run describes it.
+    # A file Apple cannot open fails the same way every run.
     row = dict(finished[len(finished) // 2] if finished else samples[-1])
     row["runs"] = runs
     row["completedRuns"] = len(finished)
@@ -124,10 +112,10 @@ def main():
         if not source.exists():
             print(f"skipping {entry['file']}: not in Tests/Corpus")
             continue
-        # A short, shell-safe name; archive file names are full of spaces and brackets.
+        # A short, shell-safe name.
         shared_files.append((entry["camera"], source, f"shared-{index}{source.suffix.lower()}"))
 
-    # In order of value; see the module comment.
+    # In the order given in the module comment.
     plan = [(name, "shared", route) for _, _, name in shared_files for route in ("apple-linear", "fallback")]
     plan += [(name, "shared", "apple") for _, _, name in shared_files]
     plan += [(sample["file"], "samples", "fallback") for sample in samples]
@@ -152,8 +140,7 @@ def main():
         outcome = row.get("error") or f"{row['totalSeconds']:.2f} s, {row['peakMegabytes']:.0f} MB peak"
         print(f"{row.get('camera') or name} [{route}]: {outcome}", flush=True)
 
-    # A limited session measures part of the list. Rows it did not reach are kept from the
-    # previous results instead of being dropped, so the file always describes every file.
+    # Rows a limited session did not reach are kept from the previous results.
     path = ROOT / "Tests" / "device-results.json"
     measured = {(row["file"], row["route"]) for row in rows}
     kept = [row for row in (json.loads(path.read_text()) if path.exists() else [])

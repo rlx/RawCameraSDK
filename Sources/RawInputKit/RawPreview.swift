@@ -4,16 +4,10 @@ import Foundation
 import ImageIO
 
 /// Extracts the preview a camera embeds in its RAW files.
-///
-/// Nearly every RAW file carries a JPEG the camera rendered at capture time, often at full
-/// resolution. Reading it takes milliseconds and no sensor decoding, and it shows the
-/// picture as the photographer saw it on the camera, which makes it the right thing to put
-/// in a grid or a culling view.
 enum RawPreview {
     static func make(_ url: URL, maxPixelSize: Int) throws -> CGImage {
-        // LibRaw first: it picks the largest of a file's several previews and understands
-        // formats ImageIO does not. ImageIO is the backstop, and can also develop a preview
-        // from the sensor data for the few files that embed none.
+        // LibRaw first: it picks the largest preview. ImageIO can also develop one from the
+        // sensor data for files that embed none.
         if let file = try? LibRawFile(url), let image = try? embedded(in: file, maxPixelSize: maxPixelSize) {
             return image
         }
@@ -24,12 +18,11 @@ enum RawPreview {
         return image
     }
 
-    /// The preview from a file LibRaw already has open, which saves parsing it twice when
-    /// the caller is in the middle of decoding it.
+    /// The preview from a file LibRaw already has open.
     static func embedded(in file: LibRawFile, maxPixelSize: Int) throws -> CGImage {
         let orientation = RawInfo(file.info).orientation
         return try file.withThumbnail { thumbnail in
-            // Copied, because the image may be decoded lazily after LibRaw's buffer is gone.
+            // Copied: the image may be decoded after LibRaw's buffer is gone.
             let data = Data(bytes: thumbnail.data, count: thumbnail.length)
 
             if thumbnail.is_jpeg == 1 {
@@ -37,16 +30,15 @@ enum RawPreview {
                       let image = CGImageSourceCreateThumbnailAtIndex(
                         source, 0, thumbnailOptions(maxPixelSize, alwaysFromImage: true) as CFDictionary)
                 else { throw RawError.noPreview }
-                // Two conventions exist. Some cameras tag the preview with its own EXIF
-                // orientation, which ImageIO has just applied. Others store it unrotated and
-                // untagged, expecting the RAW file's orientation to be used for both.
+                // ImageIO has applied the preview's own EXIF orientation if it has one.
+                // Untagged previews take the RAW file's orientation.
                 let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
                 let isTagged = properties?[kCGImagePropertyOrientation] != nil
                 return isTagged ? image : try fitted(image, orientation, maxPixelSize)
             }
 
-            // A few older formats embed an uncompressed RGB bitmap. The shim has already
-            // checked that `length` covers width * height * 3 bytes.
+            // An uncompressed RGB bitmap. The shim has checked that `length` covers
+            // width * height * 3 bytes.
             let width = Int(thumbnail.width), height = Int(thumbnail.height)
             guard let provider = CGDataProvider(data: data as CFData),
                   let image = CGImage(
@@ -59,7 +51,7 @@ enum RawPreview {
         }
     }
 
-    /// Applies the RAW file's orientation and the size limit to a preview that has neither.
+    /// Applies the RAW file's orientation and the size limit.
     private static func fitted(
         _ image: CGImage, _ orientation: CGImagePropertyOrientation, _ maxPixelSize: Int
     ) throws -> CGImage {
@@ -68,7 +60,7 @@ enum RawPreview {
         let oriented = CIImage(cgImage: image)
             .oriented(orientation)
             .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        // Rounded down, so the result never exceeds the requested size by a pixel.
+        // Rounded down to stay within the requested size.
         let bounds = CGRect(
             x: oriented.extent.minX, y: oriented.extent.minY,
             width: oriented.extent.width.rounded(.down), height: oriented.extent.height.rounded(.down))
@@ -82,8 +74,7 @@ enum RawPreview {
         [
             kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            // "Always" decodes the given JPEG itself; "if absent" lets ImageIO prefer a
-            // thumbnail the file already contains.
+            // "If absent" lets ImageIO prefer a thumbnail the file already contains.
             alwaysFromImage
                 ? kCGImageSourceCreateThumbnailFromImageAlways
                 : kCGImageSourceCreateThumbnailFromImageIfAbsent: true,

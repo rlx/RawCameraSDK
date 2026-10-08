@@ -2,10 +2,6 @@ import CoreImage
 import Foundation
 
 /// The Apple route: a thin layer over `CIRAWFilter`.
-///
-/// There is little here. Apple's engine already does demosaicing, lens
-/// correction, noise reduction and tone mapping for the cameras it supports, and it gains
-/// new cameras with OS updates. The work in this file is knowing when it will *not* work.
 enum AppleRawDecoder {
     static func decode(
         _ url: URL, options: RawDecodeOptions
@@ -16,8 +12,7 @@ enum AppleRawDecoder {
             filter.decoderVersion = newest
         }
         configure(filter, for: options.appleRendering)
-        // Keep highlights above reference white instead of clipping them; the caller decides
-        // what to do with the headroom.
+        // Keep highlights above reference white.
         filter.extendedDynamicRangeAmount = 1
 
         guard let image = filter.outputImage, !image.extent.isEmpty, !image.extent.isInfinite else {
@@ -29,19 +24,13 @@ enum AppleRawDecoder {
 
     private static func configure(_ filter: CIRAWFilter, for rendering: RawDecodeOptions.AppleRendering) {
         guard rendering == .linear else { return }
-        // "Boost" is Apple's name for its tone curve; at zero the output is proportional to
-        // the scene. Gamut mapping would bend saturated colours toward the display gamut,
-        // which is a rendering decision and belongs to whoever renders.
+        // Boost is Apple's tone curve. At zero the output is proportional to the scene.
         filter.boostAmount = 0
         filter.isGamutMappingEnabled = false
     }
 
-    /// Default brightness for Apple's linear output, measured from the pixels by the same
-    /// function that measures the fallback's (see `ExposureEstimate.measure`).
-    ///
-    /// Each decoder has its own idea of where sensor white sits, so a calibration constant
-    /// from one says nothing about the other; only the picture says how bright it came out.
-    /// Measuring costs a reduced-size decode, paid only by callers who ask for linear output.
+    /// Default brightness for Apple's linear output, measured with `ExposureEstimate.measure`
+    /// as the fallback's is. Costs a reduced-size decode.
     private static func linearExposure(_ url: URL, version: CIRAWDecoderVersion) -> Double {
         guard let filter = CIRAWFilter(imageURL: url) else { return 0 }
         filter.decoderVersion = version
@@ -53,20 +42,12 @@ enum AppleRawDecoder {
         return filter.outputImage.map(ExposureEstimate.measure) ?? 0
     }
 
-    /// Whether Apple's engine really develops the file.
+    /// Whether Apple's engine develops the file, tested by rendering a 64-pixel square from
+    /// the middle of the frame.
     ///
-    /// `CIRAWFilter(imageURL:)` succeeding proves little. The filter is lazy, and for a
-    /// camera it recognises in a compression mode it does not support it can return an
-    /// output image that renders as transparent black. The only reliable test is to ask for
-    /// pixels and check that something came out.
-    ///
-    /// It asks for as few as it can: a 64-pixel square from the middle of the frame, at full
-    /// scale. That is cheaper than a scaled-down version of the whole picture, because
-    /// `scaleFactor` still has the engine demosaic every pixel before shrinking, while a
-    /// small region lets Core Image skip the tiles it does not need. The sensor data still
-    /// has to be decompressed up to that region, so this is not free (the README has the
-    /// figures), which is why `RawInput.open` remembers a "yes" per camera and mode instead
-    /// of asking for every file.
+    /// `CIRAWFilter` can return an image that renders as transparent black for a camera it
+    /// recognises in a compression mode it does not support. The sensor data is decompressed
+    /// up to the tested region, so `RawInput.open` caches a "yes" per camera and mode.
     static func canDecode(_ url: URL) -> Bool {
         guard let filter = CIRAWFilter(imageURL: url),
               let image = filter.outputImage, !image.extent.isEmpty, !image.extent.isInfinite
@@ -79,21 +60,19 @@ enum AppleRawDecoder {
             y: (image.extent.midY - CGFloat(side) / 2).rounded(.down),
             width: CGFloat(side), height: CGFloat(side))
         var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        // Rendering into a bitmap is synchronous. `createCGImage` would not do: it defers
-        // the work until the image's pixels are first read.
+        // Synchronous. `createCGImage` defers the work until the pixels are first read.
         RenderContext.shared.render(
             image, toBitmap: &pixels, rowBytes: side * 4, bounds: region,
             format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
-        // Alpha included: a real decode is opaque, so even a black frame passes.
+        // Alpha is included, so an opaque black frame passes.
         return pixels.contains { $0 != 0 }
     }
 
-    /// The highest decoder version the OS offers for this file.
+    /// The highest decoder version the OS offers for this file, within the family the OS
+    /// chose by default.
     ///
-    /// Versions are strings such as "8" and "8.dng": a number, and a suffix naming a family
-    /// (camera files and DNG are versioned separately). Only versions in the family the OS
-    /// chose by default are considered. Parsing the strings, instead of naming a constant
-    /// such as `.version9`, keeps this compiling and running on OS versions that predate it.
+    /// Versions are strings such as "8" and "8.dng": a number and a family suffix. They are
+    /// parsed so that this builds on OS versions that lack the newer constants.
     private static func newestVersion(of filter: CIRAWFilter) -> CIRAWDecoderVersion? {
         func parts(_ version: CIRAWDecoderVersion) -> (number: Int, family: String)? {
             let pieces = version.rawValue.split(separator: ".", maxSplits: 1)

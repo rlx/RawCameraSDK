@@ -2,11 +2,7 @@ import Foundation
 
 #if os(macOS)
 /// Runs this executable again with other arguments and decodes the JSON it prints.
-///
-/// The probe and the benchmark do their real work in child processes, for two reasons.
-/// The files come from the wild, and a decoder that crashes or hangs on one of them should
-/// cost one row, not the run. And a fresh process per measurement keeps one decoder's
-/// caches and peak memory out of the next one's numbers.
+/// A decoder crash or hang costs one row, and each measurement gets a fresh process.
 enum ChildProcess {
     enum Outcome<Value> {
         case value(Value)
@@ -24,7 +20,7 @@ enum ChildProcess {
         process.standardError = FileHandle.nullDevice  // Apple's decoder logs freely
         guard (try? process.run()) != nil else { return .notStarted }
 
-        // A decoder stuck in a loop would otherwise hold the whole run hostage.
+        // Kills a child that hangs.
         let watchdog = DispatchWorkItem { process.terminate() }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
         // Read before waiting: a child blocked on a full pipe never exits.

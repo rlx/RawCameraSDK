@@ -1,6 +1,5 @@
-//! The decoder on real files: the demo app's samples, if they have been fetched
-//! (`Examples/RawInputDemo/Scripts/fetch-samples.sh`). Without them the tests pass
-//! without checking anything, and say so.
+//! The decoder on the demo app's samples (`Examples/RawInputDemo/Scripts/fetch-samples.sh`).
+//! Without them the tests pass without checking anything.
 
 use std::path::PathBuf;
 
@@ -50,7 +49,7 @@ fn opening_from_memory_matches_opening_from_a_path() {
 
 #[test]
 fn develops_a_foveon_file_on_the_cpu() {
-    // Not a Bayer sensor: no mosaic, and the core's own development is the only path.
+    // Not a Bayer sensor, so there is no mosaic.
     let Some(path) = sample("sigma-dp0-quattro.x3f") else { return };
     let mut file = RawFile::open(&path).unwrap();
     file.unpack().unwrap();

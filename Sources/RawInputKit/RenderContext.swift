@@ -1,12 +1,7 @@
 import CoreImage
 
-/// The Core Image context RawInputKit uses for its own small renders: the Apple-support
-/// probe, preview rotation, the exposure measurement and the colour check against the
-/// embedded preview. It is not used for the caller's rendering.
-///
-/// One shared context, because creating one is expensive and `CIContext` is thread-safe.
-/// Intermediates are not cached: every render here is a one-off, and the cache would only
-/// hold on to memory between unrelated files.
+/// The shared Core Image context for RawInputKit's own small renders. Intermediates are
+/// not cached, since every render here is a one-off.
 enum RenderContext {
     static let shared = CIContext(options: [.cacheIntermediates: false])
 }

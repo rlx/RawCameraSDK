@@ -6,9 +6,8 @@
     Tests/device-results.json  written by `Scripts/device-bench.py`    -> speed-device
     Tests/match-results.json   written by `rawprobe match ... --json`  -> route-match
 
-Plain SVG, no dependencies. GitHub shows the right variant through a <picture> element.
-Colours are the first two slots of a colour-blind-validated categorical palette; the same
-blue and orange mark the two decoders in the demo app.
+Plain SVG, no dependencies. Colours come from a colour-blind-validated palette and match
+the two decoders in the demo app.
 """
 import json
 import statistics
@@ -50,7 +49,7 @@ class Svg:
             f'stroke="{self.theme[color]}" stroke-width="{width}"/>')
 
     def bar(self, x, y, width, height, color, round_end=False, opacity=1.0):
-        """A horizontal bar segment. Only the free end of a bar is rounded."""
+        """A horizontal bar segment. Only the free end is rounded."""
         if width <= 0:
             return
         r = min(4, width) if round_end else 0
@@ -67,7 +66,7 @@ class Svg:
         for color, label in entries:
             self.parts.append(f'<rect x="{x}" y="{y - 10}" width="12" height="12" rx="2" fill="{self.theme[color]}"/>')
             self.text(x + 18, y, label, color="muted")
-            x += 34 + 6.4 * len(label)  # rough advance; SVG cannot measure text
+            x += 34 + 6.4 * len(label)  # rough advance, SVG cannot measure text
 
     def save(self, name, mode):
         (DOCS / f"{name}-{mode}.svg").write_text("\n".join(self.parts + ["</svg>"]) + "\n")
@@ -112,7 +111,7 @@ def coverage(rows, pool):
             segments = [(key, c[key]) for key in ("apple", "fallback", "neither") if c[key]]
             for position, (key, count) in enumerate(segments):
                 last = position == len(segments) - 1
-                # Never let a one-file segment vanish: 3 px is the smallest visible bar.
+                # 3 px minimum, so a one-file segment stays visible.
                 length = max(count * scale - (0 if last else GAP), 3)
                 svg.bar(x, y, length, BAR, key, round_end=last)
                 x += length + GAP
@@ -148,8 +147,7 @@ def agreement(rows):
 
 
 def range_rows(svg, series, left, top, row_height, scale, label_format):
-    """Rows of range bars: thin for the middle 90% of values, thick for the middle half, a
-    dot at the median."""
+    """Range bars: thin for the middle 90%, thick for the middle half, a dot at the median."""
     for index, (key, label, values) in enumerate(series):
         y = top + index * row_height + row_height / 2
         cuts = statistics.quantiles(values, n=20)  # 5% steps
@@ -191,8 +189,7 @@ def device_rows(results):
             by_file[row["file"]][row["route"]] = row
     rows = []
     for routes in by_file.values():
-        # Apple's decoder asked for scene-linear output is the like-for-like comparison with
-        # the fallback, which is always scene-linear.
+        # Apple's scene-linear output is the like-for-like comparison with the fallback.
         apple = routes.get("apple-linear") or routes.get("apple")
         if apple and "fallback" in routes:
             fallback = routes["fallback"]

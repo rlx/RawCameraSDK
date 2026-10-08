@@ -9,13 +9,11 @@ from pathlib import Path
 from brands import brand
 
 ROOT = Path(__file__).resolve().parent.parent
-# Above this chromaticity distance from the embedded preview, a decode is treated as
-# suspect: it opened, but black level, white balance or geometry is probably wrong.
+# Chromaticity distance from the embedded preview above which a decode is suspect.
 SUSPECT = 0.15
 
 pool = {e["file"]: e for e in json.loads((ROOT / "Tests" / "corpus-pool.json").read_text())}
-# Anything in the probed folder that is not part of the pool has no catalogue entry to
-# describe it, so it is left out instead of guessed at.
+# Files outside the pool have no catalogue entry and are left out.
 rows = [r for r in json.loads((ROOT / "Tests" / "probe-results.json").read_text()) if r["file"] in pool]
 
 

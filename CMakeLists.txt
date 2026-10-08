@@ -1,12 +1,10 @@
-# Builds the portable core (LibRaw and the C interface in Sources/RawShim) outside SwiftPM:
-# as a static library for C and C++ hosts, and as WebAssembly under Emscripten.
+# Builds the portable core (LibRaw and Sources/RawShim) outside SwiftPM, as a static
+# library and as WebAssembly under Emscripten.
 #
 #     cmake -S . -B .build/cmake && cmake --build .build/cmake && ctest --test-dir .build/cmake
 #     emcmake cmake -S . -B .build/wasm && cmake --build .build/wasm
 #
-# The Swift package and the Rust crate compile the same sources through their own build
-# systems; the list of sources and definitions here has to stay in step with Package.swift
-# and Bindings/rust/build.rs. Docs/PORTING.md explains the layout.
+# Sources and definitions must stay in step with Package.swift and Bindings/rust/build.rs.
 cmake_minimum_required(VERSION 3.20)
 project(rawinput_core LANGUAGES C CXX)
 
@@ -23,10 +21,10 @@ list(FILTER LIBRAW_SOURCES EXCLUDE REGEX "_ph\\.cpp$")
 add_library(rawinput_core STATIC ${LIBRAW_SOURCES} Sources/RawShim/RawShim.cpp)
 target_include_directories(rawinput_core PUBLIC Sources/RawShim/include PRIVATE Vendor/LibRaw)
 target_compile_definitions(rawinput_core PRIVATE USE_ZLIB USE_X3FTOOLS)
-target_compile_options(rawinput_core PRIVATE -w)  # LibRaw's own warnings are not ours to fix
+target_compile_options(rawinput_core PRIVATE -w)  # LibRaw's warnings
 
 if(EMSCRIPTEN)
-    # LibRaw reports errors by throwing and catching C++ exceptions internally.
+    # LibRaw throws and catches C++ exceptions internally.
     target_compile_options(rawinput_core PUBLIC -fexceptions -sUSE_ZLIB=1)
 
     add_executable(rawinput_core_wasm Bindings/web/glue.c)
@@ -37,7 +35,7 @@ if(EMSCRIPTEN)
     target_link_options(rawinput_core_wasm PRIVATE
         -fexceptions -sUSE_ZLIB=1
         -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,node
-        # RAW frames are large: start small, grow as needed, up to wasm32's 4 GB ceiling.
+        # Start small and grow, up to wasm32's 4 GB ceiling.
         -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=4GB
         -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU16,UTF8ToString
         "-sEXPORTED_FUNCTIONS=_malloc,_free,_rik_abi_version,_rik_libraw_version,_rik_strerror,_rik_open_buffer,_rik_close,_rik_set_memory_limit,_rik_unpack,_rik_get_develop_params,_rikw_info_json,_rikw_thumbnail,_rikw_mosaic,_rikw_develop,_rikw_result")

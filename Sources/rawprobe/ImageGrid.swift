@@ -2,16 +2,11 @@ import CoreImage
 @_spi(Measurement) import RawInputKit
 import simd
 
-/// Compares two renderings of the same picture, on the coarse colour grid the library
-/// also uses for its own preview check.
+/// Compares two renderings of the same picture on the library's coarse colour grid.
 enum ImageGrid {
     /// Mean colour difference between two renderings, in CIELAB ΔE (1976).
-    ///
-    /// ΔE is the standard unit for "how different do these two colours look": about 1 is
-    /// the smallest difference a person can see side by side, 2 to 5 is visible at a glance,
-    /// and above 10 the colours are plainly different. Unlike the library's preview check, this counts
-    /// brightness and contrast as well as hue, because here the question is whether two
-    /// pictures match, not whether a decode is plausible.
+    /// About 1 is just visible side by side, and above 10 is plainly different.
+    /// Counts brightness and contrast as well as hue.
     static func deltaE(_ a: CIImage, _ b: CIImage, context: CIContext) -> Double? {
         guard let first = ColorGrid.colors(of: a, context: context),
               let second = ColorGrid.colors(of: b, context: context)

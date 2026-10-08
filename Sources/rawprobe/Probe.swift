@@ -2,34 +2,31 @@ import CoreImage
 import Foundation
 @_spi(Measurement) import RawInputKit
 
-/// `rawprobe <folder>`: runs every file through both decoders and records what happened.
-/// The output is the evidence for the coverage table in the README.
+/// `rawprobe <folder>`: runs every file through both decoders and records the result.
 enum Probe {
-    /// One file's result. Field names are the JSON schema `Scripts/coverage.py` and
-    /// `Scripts/charts.py` read; rename them there too.
+    /// Field names are the JSON schema read by `Scripts/coverage.py` and `Scripts/charts.py`.
     struct Row: Codable {
         var file: String
         var camera = "?"
         var megapixels = 0.0
         var layout = "?"
-        /// LibRaw's decoding routine: in effect, the compression mode.
+        /// LibRaw's decoding routine, in effect the compression mode.
         var routine = "?"
-        /// The year the picture was taken, from its metadata; 0 if unknown.
+        /// Year taken, from metadata. 0 if unknown.
         var captureYear = 0
-        /// Apple's decoder develops the file.
         var apple = false
-        /// The fallback develops the file, to actual pixels.
+        /// The fallback develops the file to pixels.
         var fallback = false
         var fallbackDecoder = ""
         var fallbackError = ""
         var fallbackSeconds = 0.0
-        /// Colour distance from the embedded preview; see `RawImage.previewDistance`. Nil
+        /// Colour distance from the embedded preview, see `RawImage.previewDistance`. Nil
         /// when the file has no preview or the route failed.
         var applePreviewDistance: Double?
         var fallbackPreviewDistance: Double?
     }
 
-    /// Probes one file in this process. The folder run calls it through a child process.
+    /// Probes one file in this process.
     static func measure(_ url: URL) -> Row {
         let context = CIContext()
         let info = try? RawInput.info(url)
@@ -57,8 +54,7 @@ enum Probe {
             let raw = try RawInput.open(url, options: options)
             let elapsed = (ContinuousClock.now - start).components
             row.fallbackSeconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18
-            // Decoding without error is not enough to count: render a centre crop and
-            // require that real pixels come out.
+            // A decode without error only counts once a centre crop renders pixels.
             let extent = raw.image.extent
             let crop = extent.insetBy(dx: extent.width * 0.45, dy: extent.height * 0.45)
             row.fallback = RawMeasurement.renderFully(raw.image.cropped(to: crop), context: context)
@@ -78,8 +74,7 @@ enum Probe {
 
         let lock = NSLock()
         nonisolated(unsafe) var rows: [Row] = []  // guarded by `lock`
-        // Six at a time: each probe is mostly single-threaded and holds a frame or two in
-        // memory, so this keeps a laptop responsive while using its cores.
+        // Six at a time. Each probe is mostly single-threaded and holds a frame or two.
         let slots = DispatchSemaphore(value: 6)
         DispatchQueue.concurrentPerform(iterations: files.count) { index in
             slots.wait()
@@ -105,7 +100,7 @@ enum Probe {
         }
     }
 
-    /// Probes a file where a crash or a hang cannot take the run down with it.
+    /// Probes a file so that a crash or hang cannot end the run.
     private static func isolated(_ url: URL) -> Row {
         #if os(macOS)
         var row = Row(file: url.lastPathComponent)
@@ -117,8 +112,7 @@ enum Probe {
         }
         return row
         #else
-        // Child processes do not exist off the Mac. The tool is only compiled for other
-        // platforms because the package builds as a whole.
+        // No child processes off the Mac.
         return measure(url)
         #endif
     }

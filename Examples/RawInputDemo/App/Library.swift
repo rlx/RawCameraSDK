@@ -9,12 +9,12 @@ struct RawItem: Identifiable, Hashable {
     var id: URL { url }
 }
 
-/// One entry of Samples/manifest.json; the fields the app shows.
+/// One entry of Samples/manifest.json.
 private struct Sample: Decodable {
     let file: String
     let camera: String
     let format: String
-    /// "shared" marks a file both decoders open; absent for the ones only the fallback does.
+    /// "shared" marks a file both decoders open. Absent for fallback-only files.
     let group: String?
 }
 
@@ -24,7 +24,7 @@ private struct Sample: Decodable {
 final class Library {
     /// Bundled files that Apple's decoder rejects on this OS.
     private(set) var samples: [RawItem] = []
-    /// A bundled file both decoders open: the one to compare them on.
+    /// A bundled file both decoders open.
     private(set) var shared: [RawItem] = []
     private(set) var imported: [RawItem] = []
     /// Set when an import fails, for the gallery to show.
@@ -47,10 +47,9 @@ final class Library {
 
     /// Copies picked files into the app's temporary folder and lists them.
     ///
-    /// A copy, because access to a picked file ends when the picker's security scope does,
-    /// and Apple's decoder reads its file lazily, long after the pick. Each file gets a
-    /// folder of its own: cards are full of files with the same name (`IMG_0001.CR3` from
-    /// two shoots), and a file must never be replaced under a view that has it open.
+    /// Access to a picked file ends with the picker's security scope, and Apple's decoder
+    /// reads lazily. Each file gets its own folder, so a same-named file never replaces one
+    /// a view has open.
     func add(_ urls: [URL]) async {
         let root = FileManager.default.temporaryDirectory.appending(path: "Imported")
         for url in urls {

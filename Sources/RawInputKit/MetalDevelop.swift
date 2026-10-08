@@ -4,57 +4,41 @@ import RawShim
 
 /// Develops a Bayer mosaic into scene-linear RGB on the GPU.
 ///
-/// One compute kernel does, per output pixel:
+/// Per output pixel: subtract black, normalise to white, white balance, clip, demosaic
+/// (Hamilton-Adams), then a 3x3 matrix from camera RGB to linear sRGB.
 ///
-///     raw sample ─▶ subtract black ─▶ normalise to white ─▶ white balance ─▶ clip
-///                ─▶ demosaic (interpolate the two missing colours)
-///                ─▶ 3x3 matrix: camera RGB ─▶ linear sRGB
+/// Coordinates: the mosaic texture holds the whole raw plane, masked borders included. The
+/// kernel works in picture coordinates, with (0, 0) at the top-left of the visible area,
+/// and adds `origin` when it reads the texture. Mosaic positions, the colour pattern and
+/// black levels are indexed in picture coordinates: `(row & 1) * 2 + (column & 1)`.
 ///
-/// **Coordinates.** The mosaic texture holds the whole raw plane, masked borders included.
-/// The kernel works in *picture* coordinates, with (0, 0) at the top-left of the visible
-/// area, and adds `origin` when it reads the texture. Mosaic positions, the colour pattern
-/// and black levels are all indexed in picture coordinates: `(row & 1) * 2 + (column & 1)`.
-///
-/// **Demosaicing** is Hamilton-Adams: green is interpolated along whichever direction,
-/// horizontal or vertical, has the smaller gradient; red and blue are then interpolated as
-/// differences from green, which vary slowly across an image. It is a modest
-/// algorithm: no patents in force, a few dozen texture reads per pixel, and good enough to
-/// judge a picture. The better-known AMaZE and RCD are GPL and cannot be used here.
-///
-/// **Thread safety.** The Metal objects held are immutable after `init` and safe to use
-/// from several threads, which is what `@unchecked Sendable` asserts.
+/// Thread-safe: the Metal objects held are immutable after `init`.
 final class MetalDevelop: @unchecked Sendable {
-    /// `nil` when the device has no usable GPU; callers then use LibRaw's CPU development.
+    /// `nil` when the device has no usable GPU.
     static let shared: MetalDevelop? = MetalDevelop()
 
-    /// Mirrors `Params` in the shader, field for field.
-    ///
-    /// The two declarations are a binary contract: Metal reads this struct's bytes as that
-    /// one. SIMD types have the same size and alignment in Swift and in the shading
-    /// language, and the fields are ordered so that neither side inserts padding before the
-    /// last one. A test pins the offsets; change both declarations together or not at all.
+    /// Mirrors `Params` in the shader, field for field. Metal reads this struct's bytes as
+    /// that one, and a test pins the offsets. Change both declarations together.
     struct Parameters {
         /// Black level at each mosaic position, in raw sample values.
         var black: SIMD4<Float>
-        /// Multiplier for red, green and blue (the fourth lane is unused), scaled so the
-        /// smallest is 1.
+        /// Multipliers for red, green and blue, scaled so the smallest is 1. Fourth lane unused.
         var whiteBalance: SIMD4<Float>
-        /// Rows of the camera-to-sRGB matrix (the fourth lane is unused).
+        /// Rows of the camera-to-sRGB matrix. Fourth lane unused.
         var matrixRow0: SIMD4<Float>
         var matrixRow1: SIMD4<Float>
         var matrixRow2: SIMD4<Float>
         /// Colour at each mosaic position: 0 red, 1 green, 2 blue.
         var pattern: SIMD4<UInt32>
-        /// Where the picture starts inside the raw plane.
+        /// Picture offset inside the raw plane.
         var origin: SIMD2<UInt32>
-        /// Size of the picture.
         var size: SIMD2<UInt32>
         /// Saturation level, in raw sample values.
         var white: Float
         var padding: UInt32 = 0
     }
 
-    /// GPU family limit for 2D textures on every device this package supports.
+    /// 2D texture limit on every supported device.
     private static let maximumTextureSide = 16_384
 
     private let device: MTLDevice
@@ -67,9 +51,7 @@ final class MetalDevelop: @unchecked Sendable {
             return nil
         }
         do {
-            // The shader is compiled from source at first use instead of shipping as a
-            // .metal file. `swift build` and `swift test` do not run the Metal
-            // compiler, so a precompiled library would only exist in Xcode builds.
+            // Compiled from source because `swift build` does not run the Metal compiler.
             let library = try device.makeLibrary(source: Self.source, options: nil)
             guard let full = library.makeFunction(name: "develop_full"),
                   let half = library.makeFunction(name: "develop_half")
@@ -77,8 +59,7 @@ final class MetalDevelop: @unchecked Sendable {
             self.fullSize = try device.makeComputePipelineState(function: full)
             self.halfSize = try device.makeComputePipelineState(function: half)
         } catch {
-            // Only reachable if the shader source below is broken, which is a programming
-            // error; the CPU path keeps release builds working regardless.
+            // Only reachable if the shader source is broken. Release builds use the CPU path.
             assertionFailure("RawInputKit shader failed to compile: \(error)")
             return nil
         }
@@ -90,11 +71,9 @@ final class MetalDevelop: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - mosaic: `rawWidth` x `rawHeight` 16-bit samples, rows `rowBytes` apart. Only read
-    ///     during the call; the samples are copied into a texture.
-    ///   - halfSize: produce one pixel per 2x2 mosaic cell instead of interpolating. Half
-    ///     the width and height, a quarter of the memory, and no demosaic artefacts.
-    /// - Returns: an image in extended linear sRGB, **not yet rotated**; the caller applies
-    ///   the camera's orientation. It is backed by a texture this call allocated.
+    ///     during the call.
+    ///   - halfSize: produce one pixel per 2x2 mosaic cell, with no interpolation.
+    /// - Returns: an image in extended linear sRGB, unrotated, backed by a new texture.
     func develop(
         mosaic: UnsafeRawPointer, rowBytes: Int, rawWidth: Int, rawHeight: Int,
         parameters: Parameters, halfSize: Bool
@@ -133,8 +112,7 @@ final class MetalDevelop: @unchecked Sendable {
         withUnsafeBytes(of: parameters) { bytes in
             encoder.setBytes(bytes.baseAddress!, length: bytes.count, index: 0)
         }
-        // Whole threadgroups are dispatched, so the grid can overshoot the texture by up to
-        // one group; the kernel discards threads that fall outside it.
+        // The grid can overshoot the texture by up to one group. The kernel discards the excess.
         let group = MTLSize(
             width: pipeline.threadExecutionWidth,
             height: pipeline.maxTotalThreadsPerThreadgroup / pipeline.threadExecutionWidth, depth: 1)
@@ -153,8 +131,7 @@ final class MetalDevelop: @unchecked Sendable {
         guard let colorSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB),
               let image = CIImage(mtlTexture: output, options: [.colorSpace: colorSpace])
         else { throw RawError.renderFailed(reason: "could not wrap the developed texture") }
-        // A texture's first row is the top of the picture; Core Image puts its origin at the
-        // bottom-left and would show it upside down. Flip it vertically.
+        // Texture row 0 is the top of the picture and Core Image's origin is bottom-left.
         return image.oriented(.downMirrored)
     }
 
@@ -162,14 +139,14 @@ final class MetalDevelop: @unchecked Sendable {
     #include <metal_stdlib>
     using namespace metal;
 
-    // Mirrors MetalDevelop.Parameters in Swift, field for field. Keep the two in step.
+    // Mirrors MetalDevelop.Parameters in Swift, field for field.
     struct Params {
         float4 black;        // per mosaic position: (row & 1) * 2 + (col & 1)
-        float4 wb;           // per colour; the smallest multiplier is 1
-        float4 m0, m1, m2;   // rows of the matrix: white-balanced camera RGB -> linear sRGB
-        uint4 pattern;       // colour at each mosaic position: 0 R, 1 G, 2 B
+        float4 wb;           // per colour
+        float4 m0, m1, m2;   // rows: white-balanced camera RGB -> linear sRGB
+        uint4 pattern;       // 0 R, 1 G, 2 B
         uint2 origin;        // picture offset inside the raw plane
-        uint2 size;          // picture size
+        uint2 size;
         float white;
         uint padding;
     };
@@ -179,16 +156,12 @@ final class MetalDevelop: @unchecked Sendable {
     // Index of a picture coordinate within the 2x2 mosaic cell.
     static inline uint position(int2 p) { return uint(p.y & 1) * 2 + uint(p.x & 1); }
 
-    // One sensor sample, ready to interpolate: black subtracted, scaled so that sensor
-    // white is 1, and white-balanced.
+    // One sensor sample: black subtracted, scaled so sensor white is 1, white-balanced.
     //
-    // Coordinates outside the picture are mirrored about the edge pixel. Mirroring moves a
-    // coordinate by an even distance, so the reflected sample has the same colour as the
-    // one asked for and the interpolation needs no special cases at the border.
+    // Coordinates outside the picture are mirrored about the edge pixel, which keeps the
+    // sample's colour.
     //
-    // The clip to 1 happens after white balance on purpose. A blown highlight saturates all
-    // three channels at sensor white; white balance then scales red and blue past green,
-    // and without the clip the highlight would turn magenta.
+    // The clip to 1 comes after white balance. Clipping earlier turns blown highlights magenta.
     static inline float value(Mosaic mosaic, constant Params &params, int2 p) {
         int2 last = int2(params.size) - 1;
         p = abs(p);
@@ -199,10 +172,8 @@ final class MetalDevelop: @unchecked Sendable {
         return min(max(v, 0.0f) * params.wb[params.pattern[pos]], 1.0f);
     }
 
-    // Green at any pixel. At a green site it is the sample itself. At a red or blue site it
-    // is interpolated along the direction, horizontal or vertical, in which the image
-    // changes least, so that edges are followed and not smeared across. The second term
-    // of each estimate corrects it with the curvature of the colour that IS sampled here.
+    // Green at any pixel. At a red or blue site it is interpolated along the direction with
+    // the smaller gradient, corrected by the curvature of the colour sampled here.
     static inline float green(Mosaic mosaic, constant Params &params, int2 p) {
         float c = value(mosaic, params, p);
         if (params.pattern[position(p)] == 1) return c;
@@ -218,9 +189,7 @@ final class MetalDevelop: @unchecked Sendable {
         return max(g, 0.0f);
     }
 
-    // Red or blue minus green, at a red or blue site. Colour differences change far more
-    // slowly across an image than the colours themselves, so averaging them is safe where
-    // averaging raw red or blue would blur and fringe.
+    // Red or blue minus green, at a red or blue site.
     static inline float chroma(Mosaic mosaic, constant Params &params, int2 p) {
         return value(mosaic, params, p) - green(mosaic, params, p);
     }
@@ -241,8 +210,7 @@ final class MetalDevelop: @unchecked Sendable {
         float3 camera = float3(0, g, 0);
 
         if (color == 1) {
-            // A green site has one of red/blue to its left and right and the other above
-            // and below. `2 - colour` turns red (0) into blue (2) and back.
+            // Red and blue lie on opposite axes. `2 - colour` swaps red (0) and blue (2).
             float horizontal = (chroma(mosaic, params, p + int2(-1, 0)) + chroma(mosaic, params, p + int2(1, 0))) * 0.5f;
             float vertical = (chroma(mosaic, params, p + int2(0, -1)) + chroma(mosaic, params, p + int2(0, 1))) * 0.5f;
             uint horizontalColor = params.pattern[position(p + int2(1, 0))];
@@ -277,8 +245,7 @@ final class MetalDevelop: @unchecked Sendable {
 }
 
 extension MetalDevelop.Parameters {
-    /// The core's parameter block, field for field. Both are the kernel's uniform block;
-    /// the core's version is the definition and this one exists to give the fields types.
+    /// Copies the core's parameter block, field for field.
     init(_ core: rik_develop_params) {
         self.init(
             black: SIMD4(core.black.0, core.black.1, core.black.2, core.black.3),

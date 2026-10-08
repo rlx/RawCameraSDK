@@ -1,13 +1,10 @@
 import XCTest
 
-/// Drives the demo through its whole story, the way a person would:
+/// Drives the demo through two files: one both decoders open, switched between them with
+/// and without the shared look, and one only the fallback opens.
 ///
-///   1. a file both decoders open, switched between them, with and without the shared look;
-///   2. a file Apple's decoder rejects, and the fallback developing it.
-///
-/// It is a smoke test for the app, and the script for the screen recording in the README
-/// (`Scripts/record-demo.sh` records the simulator while this runs), which is why it pauses
-/// where a viewer needs time to look.
+/// Also the script for the README's screen recording (`Scripts/record-demo.sh`), so it
+/// pauses where a viewer needs time to look.
 @MainActor
 final class WalkthroughTests: XCTestCase {
     private var app: XCUIApplication!
@@ -19,7 +16,7 @@ final class WalkthroughTests: XCTestCase {
     }
 
     func testWalkthrough() {
-        // A file both decoders open: their own outputs differ, the shared look does not.
+        // A file both decoders open.
         open("Sony a9 III")
         expectDecoder("Apple RAW")
         select("Fallback")

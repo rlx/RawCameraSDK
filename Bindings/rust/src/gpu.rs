@@ -1,16 +1,14 @@
 //! The development kernel under wgpu: a Bayer mosaic in, scene-linear RGB out.
 //!
-//! This is the same kernel as the Metal one in the Swift package, in WGSL. Both are checked
-//! against `Conformance/kernel-cases.json`. It runs wherever wgpu does, including WebGPU.
+//! Same kernel as the Metal one in the Swift package. Both are checked against
+//! `Conformance/kernel-cases.json`.
 
 use crate::{DevelopParams, Mosaic};
 
-/// The shader source, for callers that want to build the pipeline into an engine of their
-/// own instead of using [`Developer`].
+/// The shader source, for callers building their own pipeline.
 pub const KERNEL_WGSL: &str = include_str!("../../../Shaders/develop.wgsl");
 
-// The parameter block is plain data with no padding the compiler could add: its fields
-// fill exactly 128 bytes at 4-byte alignment.
+// Plain data with no padding: 128 bytes at 4-byte alignment.
 unsafe impl bytemuck::Zeroable for DevelopParams {}
 unsafe impl bytemuck::Pod for DevelopParams {}
 
@@ -39,11 +37,9 @@ impl Developer {
         Self { full: pipeline("develop_full"), half: pipeline("develop_half") }
     }
 
-    /// Develops a mosaic into a new `Rgba16Float` texture holding linear sRGB values, with
-    /// the top row of the picture as row 0. The picture is not rotated; apply `Info::flip`.
-    ///
-    /// `half_size` produces one pixel per 2x2 mosaic cell: half the width and height, a
-    /// quarter of the memory, no interpolation.
+    /// Develops a mosaic into a new `Rgba16Float` texture of linear sRGB values, top row first.
+    /// The picture is not rotated. Apply `Info::flip`.
+    /// `half_size` gives one pixel per 2x2 mosaic cell, with no interpolation.
     pub fn develop(
         &self,
         device: &wgpu::Device,
@@ -123,7 +119,7 @@ impl Developer {
             let mut pass = encoder.begin_compute_pass(&Default::default());
             pass.set_pipeline(pipeline);
             pass.set_bind_group(0, &bindings, &[]);
-            // The shader's workgroup is 8x8; it discards invocations past the texture's edge.
+            // Workgroups are 8x8. The shader discards invocations past the texture's edge.
             pass.dispatch_workgroups(size.width.div_ceil(8), size.height.div_ceil(8), 1);
         }
         queue.submit([encoder.finish()]);

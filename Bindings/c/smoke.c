@@ -1,5 +1,5 @@
-/* Proves the portable core builds and runs from plain C, with no Swift and no Apple
- * frameworks: open a RAW file, read its metadata, decode it, develop it on the CPU.
+/* Smoke test for the portable core from plain C: open a RAW file, read its metadata,
+ * decode it, develop it on the CPU.
  *
  *     core_smoke <file.raw>
  */
@@ -21,8 +21,7 @@ int main(int argc, char **argv) {
     }
     printf("core ABI %d, %s\n", rik_abi_version(), rik_libraw_version());
 
-    /* Read the file into memory and open the buffer, the path a host without a file
-     * system takes. */
+    /* Open from memory, as a host without a file system does. */
     FILE *file = fopen(argv[1], "rb");
     if (!file) {
         perror(argv[1]);

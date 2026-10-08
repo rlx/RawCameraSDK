@@ -46,9 +46,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
         ENABLE_HARDENED_RUNTIME: YES
-  # The package's own test suite, hosted in the app so it can run on a physical device.
-  # `swift test` and the package scheme cover the Mac and the simulator; a device will only
-  # run tests that live inside an app. Same source files, no copies.
+  # The package's test suite, hosted in the app so it can run on a physical device.
+  # Same source files, no copies.
   RawInputDemoTests:
     type: bundle.unit-test
     supportedDestinations: [iOS, macOS]
@@ -85,14 +84,14 @@ targets:
         TEST_TARGET_NAME: RawInputDemo
         CODE_SIGN_STYLE: Automatic
 schemes:
-  # Kept apart from the unit tests: it needs a simulator on screen and takes a minute.
+  # Kept apart from the unit tests. Needs a simulator on screen and takes a minute.
   RawInputDemoUITests:
     build:
       targets:
         RawInputDemo: all
         RawInputDemoUITests: [test]
     test:
-      # Release, so the walkthrough shows the decoders at their real speed.
+      # Release, so the walkthrough shows the decoders at full speed.
       config: Release
       targets:
         - RawInputDemoUITests
@@ -106,6 +105,5 @@ schemes:
       targets:
         - RawInputDemoTests
     run:
-      # Release, because the fallback's CPU paths (X-Trans, Foveon) are many times
-      # slower when LibRaw is built without optimisation.
+      # Release. The fallback's CPU paths (X-Trans, Foveon) are many times slower unoptimised.
       config: Release

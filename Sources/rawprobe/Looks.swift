@@ -2,11 +2,10 @@ import CoreImage
 import Foundation
 import RawInputKit
 
-/// `rawprobe looks`: shows what the shared rendering step is for.
+/// `rawprobe looks`: both decoders with and without the shared rendering step.
 ///
-/// Top row, each decoder's own output: Apple's finished picture next to the fallback's flat
-/// one. They do not belong in the same gallery. The rows below take scene-linear data from
-/// both decoders through the same `RawLook`, and the two columns should be hard to tell apart.
+/// The top row is each decoder's own output. The rows below take scene-linear data from
+/// both through the same `RawLook`, and the two columns should be hard to tell apart.
 enum Looks {
     static func run(input: URL, output: URL) throws {
         let appleOwn = try Compare.open(input, .apple)

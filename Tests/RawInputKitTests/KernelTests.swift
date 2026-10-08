@@ -3,29 +3,25 @@ import Testing
 import simd
 @testable import RawInputKit
 
-/// The GPU kernel against mosaics built by hand, where the right answer is known exactly.
-///
-/// Real files cannot pin these properties: a picture developed with the Bayer pattern
-/// shifted by a pixel, or flipped top to bottom, is still a plausible-looking picture.
+/// The GPU kernel against hand-built mosaics with known answers. A real file developed
+/// with the pattern shifted by a pixel, or flipped top to bottom, still looks plausible.
 @Suite("Metal kernel", .enabled(if: MetalDevelop.shared != nil, "needs a GPU"))
 struct KernelTests {
-    /// A picture of `width` x `height` sitting inside a larger raw plane, as in a real file:
-    /// the border stands in for the sensor's masked pixels and is filled with a value that
-    /// would visibly corrupt the result if the kernel ever read it.
+    /// A `width` x `height` picture inside a larger raw plane. The border stands in for
+    /// masked sensor pixels and holds a value that corrupts the result if the kernel reads it.
     struct Mosaic {
         static let origin = SIMD2<UInt32>(2, 1)
         static let black: Float = 64, white: Float = 1064
 
         let width: Int, height: Int
         let pattern: SIMD4<UInt32>
-        /// Black level at each of the four mosaic positions. Real sensors differ per site.
+        /// Black level at each of the four mosaic positions.
         let blackLevels: SIMD4<Float>
         var samples: [UInt16]
         var rawWidth: Int { width + 5 }
         var rawHeight: Int { height + 3 }
 
-        /// `color(x, y)` is the scene colour at a picture coordinate, in 0...1 per channel;
-        /// each sensor site records only its own channel of it.
+        /// `color(x, y)` is the scene colour at a picture coordinate, 0...1 per channel.
         init(
             width: Int = 8, height: Int = 8, pattern: SIMD4<UInt32>,
             blackLevels: SIMD4<Float> = SIMD4(repeating: Mosaic.black), color: (Int, Int) -> SIMD3<Float>
@@ -64,7 +60,7 @@ struct KernelTests {
         }
     }
 
-    /// The four arrangements of a Bayer cell, named by reading order.
+    /// The four Bayer cell arrangements, in reading order.
     static let patterns: [SIMD4<UInt32>] = [
         SIMD4(0, 1, 1, 2),  // RGGB
         SIMD4(2, 1, 1, 0),  // BGGR
@@ -80,8 +76,8 @@ struct KernelTests {
     func flatColorSurvivesDemosaic(_ pattern: SIMD4<UInt32>) throws {
         let developed = try Mosaic(pattern: pattern) { _, _ in Self.flat }.develop()
         #expect(developed.count == 8 && developed[0].count == 8)
-        // Every pixel, borders included: a wrong pattern index, a wrong origin or a read of
-        // the masked border would each change some of them.
+        // Every pixel is checked, so a wrong pattern index or origin, or a read of the
+        // masked border, shows up.
         for row in developed {
             for pixel in row {
                 #expect(simd_distance(pixel, Self.flat) < Self.tolerance)
@@ -98,9 +94,7 @@ struct KernelTests {
         }
     }
 
-    /// Black level is per mosaic position, not per colour: the two greens of a cell often
-    /// differ. Indexing it by colour, or by raw instead of picture coordinates, would leave
-    /// a faint checkerboard that a flat field makes obvious.
+    /// Black level is per mosaic position. The two greens of a cell often differ.
     @Test(arguments: patterns)
     func perPositionBlackLevelsAreSubtracted(_ pattern: SIMD4<UInt32>) throws {
         let developed = try Mosaic(pattern: pattern, blackLevels: SIMD4(40, 64, 88, 120)) { _, _ in Self.flat }
@@ -111,8 +105,7 @@ struct KernelTests {
     }
 
     @Test func topOfPictureIsTopOfImage() throws {
-        // Dark above, bright below. Metal and Core Image disagree about which way is up, and
-        // getting the flip wrong still yields a perfectly valid image, upside down.
+        // Dark above, bright below. Metal and Core Image disagree about which way is up.
         let developed = try Mosaic(pattern: Self.patterns[0]) { _, y in SIMD3(repeating: y < 4 ? 0.1 : 0.9) }
             .develop()
         #expect(developed[0][4].y < 0.2)
@@ -133,15 +126,14 @@ struct KernelTests {
     }
 
     @Test func blownHighlightsStayNeutral() throws {
-        // A saturated sensor reads white in every channel. White balance must not push red
-        // and blue past green, or highlights turn magenta.
+        // White balance must not push red and blue past green on a saturated sensor, or
+        // highlights turn magenta.
         let developed = try Mosaic(pattern: Self.patterns[0]) { _, _ in SIMD3(1, 1, 1) }
             .develop(whiteBalance: SIMD3(2.2, 1, 1.6))
         #expect(simd_distance(developed[4][4], SIMD3(1, 1, 1)) < Self.tolerance)
     }
 
-    /// The cases every edition of the kernel has to pass, whatever it is written in. The
-    /// Rust crate runs the same file against the WGSL kernel under wgpu.
+    /// The Rust crate runs the same case file against the WGSL kernel under wgpu.
     @Test(arguments: ConformanceCase.all)
     func passesSharedConformanceCase(_ test: ConformanceCase) throws {
         let p = test.params
@@ -170,8 +162,7 @@ struct KernelTests {
         }
     }
 
-    /// The Swift struct and the shader struct are read as the same bytes. If these move,
-    /// `Params` in the shader source has to move with them.
+    /// If these offsets move, `Params` in the shader source has to move with them.
     @Test func parameterLayoutMatchesShader() {
         typealias Layout = MemoryLayout<MetalDevelop.Parameters>
         #expect(Layout.offset(of: \.black) == 0)
@@ -215,7 +206,7 @@ struct ConformanceCase: Decodable, CustomTestStringConvertible {
     }
 
     private static let document: Document? = {
-        // From the repository when there is one; from the test bundle on a device.
+        // From the repository, or from the test bundle on a device.
         let inRepository = Fixtures.root.appending(path: "Conformance/kernel-cases.json")
         let bundled = Bundle.allBundles.lazy.compactMap { $0.url(forResource: "kernel-cases", withExtension: "json") }
         return ([inRepository] + Array(bundled)).lazy

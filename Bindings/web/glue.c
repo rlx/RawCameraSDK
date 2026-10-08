@@ -1,9 +1,7 @@
 /* The WebAssembly build's entry points.
  *
- * JavaScript can call the core's functions directly, but it cannot read a C struct without
- * knowing its layout, and layouts are exactly what should not be duplicated in a second
- * language. So the calls that return structs are wrapped here: text comes back as JSON,
- * and everything else as a few numbers read with rikw_result().
+ * Calls that return structs are wrapped so JavaScript needs no struct layouts. Text comes
+ * back as JSON, numbers through rikw_result().
  */
 #include <stdio.h>
 #include <string.h>
@@ -15,8 +13,8 @@ static double results[8];
 /* The numbers left by the last rikw_* call. Pointers are offsets into the module's memory. */
 double rikw_result(int index) { return index >= 0 && index < 8 ? results[index] : 0; }
 
-/* Appends a JSON string, escaping the two characters that can break one. Camera names are
- * plain ASCII in practice; anything below a space is dropped. */
+/* Appends a JSON string, escaping the two characters that can break one. Anything below a
+ * space is dropped. */
 static size_t append_string(char *out, size_t at, size_t capacity, const char *text) {
     if (at + 1 < capacity)
         out[at++] = '"';

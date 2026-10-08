@@ -3,25 +3,23 @@
 //
 //     import { loadRawInput } from './rawinput.mjs';
 //     const rawInput = await loadRawInput();
-//     const file = rawInput.open(bytes);          // a Uint8Array holding the whole file
+//     const file = rawInput.open(bytes);          // a Uint8Array
 //     console.log(file.info.make, file.info.model);
 //     file.unpack();
-//     const picture = file.developCPU();          // linear 16-bit RGB, any file the core decodes
+//     const picture = file.developCPU();          // linear 16-bit RGB
 //     file.close();
 //
 // Build the module first: `emcmake cmake -S . -B .build/wasm && cmake --build .build/wasm`
 // from the repository root, which writes dist/rawinput_core.mjs and .wasm next to this file.
 //
-// What a browser does with the result is up to the caller. For plain Bayer files, mosaic()
-// and developParams() are the inputs to the WebGPU kernel in Shaders/develop.wgsl: the
-// parameter block is the kernel's uniform buffer as it is. developCPU() needs no GPU.
+// For plain Bayer files, mosaic() and developParams() feed the WebGPU kernel in
+// Shaders/develop.wgsl. developCPU() needs no GPU.
 //
-// Everything returned is a copy. The module's memory can grow and move during a later call,
-// which would silently detach a view into it.
+// Everything returned is a copy, because the module's memory can move during a later call.
 
 import createCore from './dist/rawinput_core.mjs';
 
-/** The interface version this file was written against; see rik_abi_version in RawShim.h. */
+/** Must match rik_abi_version in RawShim.h. */
 const ABI_VERSION = 1;
 
 export class RawInputError extends Error {
@@ -46,7 +44,7 @@ export async function loadRawInput() {
 
   class RawFile {
     #handle;
-    #bytes; // the file, inside the module's memory; the core reads from it until close()
+    #bytes; // the file in module memory, read by the core until close()
 
     constructor(handle, bytes) {
       this.#handle = handle;
@@ -70,7 +68,7 @@ export async function loadRawInput() {
       return { bytes: core.HEAPU8.slice(pointer, pointer + length), width, height, isJPEG: isJPEG === 1 };
     }
 
-    /** Decompresses the sensor data: the expensive step. */
+    /** Decompresses the sensor data. Expensive. */
     unpack() {
       check(core._rik_unpack(this.#handle));
       if (this.info.dataErrors) {
@@ -89,10 +87,7 @@ export async function loadRawInput() {
       return { samples: core.HEAPU16.slice(start, start + rowStride * rawHeight), rawWidth, rawHeight, rowStride };
     }
 
-    /**
-     * The 128-byte parameter block for the development kernel, or null if the file is not
-     * a plain Bayer mosaic. Upload it as the kernel's uniform buffer unchanged.
-     */
+    /** The kernel's 128-byte uniform buffer, or null if the file is not a plain Bayer mosaic. */
     developParams() {
       const pointer = core._malloc(128);
       try {
@@ -104,9 +99,8 @@ export async function loadRawInput() {
     }
 
     /**
-     * The core's own development on the CPU: linear, 16 bits per channel, not rotated.
-     * Works for every file the core can decode. `channels` is 3 (RGB, sRGB primaries) or
-     * 1 (monochrome sensor).
+     * The core's CPU development: linear, 16 bits per channel, not rotated.
+     * `channels` is 3 (RGB, sRGB primaries) or 1 (monochrome sensor).
      */
     developCPU({ halfSize = false } = {}) {
       check(core._rikw_develop(this.#handle, halfSize ? 1 : 0));
@@ -118,7 +112,7 @@ export async function loadRawInput() {
       };
     }
 
-    /** Releases the file. Nothing else here frees it; JavaScript has no destructors. */
+    /** Releases the file. Nothing else frees it. */
     close() {
       if (this.#handle === 0) return;
       core._rik_close(this.#handle);
@@ -131,7 +125,7 @@ export async function loadRawInput() {
     /** The decoder library's version. */
     version: core.UTF8ToString(core._rik_libraw_version()),
 
-    /** Parses a RAW file held in memory. Cheap; no sensor data is read until unpack(). */
+    /** Parses a RAW file held in memory. No sensor data is read until unpack(). */
     open(bytes) {
       const copy = core._malloc(bytes.length);
       core.HEAPU8.set(bytes, copy);

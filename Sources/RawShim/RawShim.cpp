@@ -1,17 +1,8 @@
-// Implementation of the C interface declared in RawShim.h. Read that header first: it
-// documents the lifecycle, ownership and threading rules this file implements.
+// Implements RawShim.h, which documents lifecycle, ownership and threading.
 //
-// A note on LibRaw's state, because most of the subtlety here comes from it. A `LibRaw`
-// object is one large mutable struct (`imgdata`) that different calls fill in and rewrite:
-//
-//   open_file()      fills identification, exposure and nominal geometry
-//   unpack()         decodes the sensor plane and finalises black levels from the masked
-//                    border; it does NOT compute the real white level
-//   dcraw_process()  develops the image and, along the way, overwrites geometry fields
-//                    (width, height, flip) with the processed image's
-//
-// So "read the field when it is valid, and remember it" is the rule throughout: anything
-// the caller may ask for after processing is captured at unpack time.
+// LibRaw keeps one mutable struct (`imgdata`). unpack() finalises black levels but leaves
+// the nominal white level. dcraw_process() overwrites width, height and flip. Anything the
+// caller may ask for after processing is captured in rik_unpack.
 
 #include "RawShim.h"
 
@@ -29,7 +20,7 @@ struct rik_handle {
     bool data_errors = false;
     bool half_size_applied = false;
 
-    // Captured in rik_unpack; see the note at the top of the file.
+    // Captured in rik_unpack.
     int flip = 0;
     float white = 0;
     uint8_t bayer[4] = {};
@@ -64,15 +55,12 @@ int cfa_kind(const libraw_iparams_t &id) {
         return RIK_CFA_XTRANS;
     if (id.filters < 1000)
         return RIK_CFA_OTHER;
-    // LibRaw describes plain Bayer sensors either as three colours or as four with the
-    // second green listed separately ("RGBG"). A real fourth colour (CMYG, RGBE) is not Bayer.
+    // Plain Bayer is three colours, or four with the second green listed separately ("RGBG").
     bool rgb = id.colors == 3 || (id.colors == 4 && id.cdesc[3] == 'G');
     return rgb ? RIK_CFA_BAYER : RIK_CFA_OTHER;
 }
 
-// Runs `body` so that nothing it throws crosses into the caller. LibRaw catches its own
-// exceptions at its public entry points, but an allocation failure in this file, or in
-// code LibRaw calls, would otherwise unwind through a C function into Swift.
+// Stops anything `body` throws from unwinding through a C function into the caller.
 template <typename Body> int guarded(Body body) {
     try {
         return body();
@@ -83,29 +71,20 @@ template <typename Body> int guarded(Body body) {
     }
 }
 
-// LibRaw reports progress between decoding stages and stops if this returns non-zero.
+// LibRaw stops if this returns non-zero.
 int on_progress(void *context, enum LibRaw_progress, int, int) {
     rik_handle *handle = static_cast<rik_handle *>(context);
     return handle->cancel && handle->cancel(handle->cancel_context) ? 1 : 0;
 }
 
-// LibRaw calls this when a decoder runs out of data or meets an invalid stream. Its default
-// handler prints to stderr; a library should report through its API instead.
+// Replaces LibRaw's default handler, which prints to stderr.
 void on_data_error(void *context, const char *, const INT64) {
     static_cast<rik_handle *>(context)->data_errors = true;
 }
 
-// Narrows the picture rectangle to the camera's own crop.
-//
-// Many cameras record a crop inside the sensor area: an in-camera aspect ratio (1:1, 16:9)
-// or simply the region the maker considers the image. LibRaw parses it but leaves applying
-// it to the caller; without it the fallback would return a differently framed picture than
-// Apple's decoder and the camera's JPEG.
-//
-// The crop origin is kept on the same mosaic phase as the original margins (an even offset
-// for Bayer), so the colour pattern does not shift under either the GPU kernel or LibRaw's
-// own demosaic. X-Trans is left alone: its pattern repeats every six pixels and LibRaw's
-// tables are tied to the original origin.
+// Narrows the picture rectangle to the camera's own crop, which LibRaw parses but does not
+// apply. The origin stays on the same mosaic phase as the original margins.
+// X-Trans is skipped: LibRaw's tables are tied to the original origin.
 void apply_camera_crop(LibRaw &raw) {
     libraw_image_sizes_t &sizes = raw.imgdata.sizes;
     if (raw.imgdata.idata.filters == 9)
@@ -131,14 +110,9 @@ void apply_camera_crop(LibRaw &raw) {
     raw.imgdata.rawdata.sizes.height = sizes.height;
 }
 
-// The level at which the sensor actually clips.
-//
-// `color.maximum` is a nominal value from LibRaw's tables or the file's metadata, and for
-// many cameras the data saturates somewhat below it. Developing against the nominal value
-// leaves blown highlights short of white in the green channel while red and blue, which
-// white balance scales up, still clip: magenta highlights. LibRaw's own development avoids
-// this with the rule reproduced here: trust the brightest sample in the picture when it is
-// below the nominal maximum but above 75% of it (below that, the picture is simply dark).
+// The level at which the sensor clips. `color.maximum` is nominal and many cameras saturate
+// below it, which gives magenta highlights. LibRaw's rule: use the brightest sample when it
+// is below the nominal maximum and above 75% of it.
 float effective_white(const libraw_data_t &d) {
     const libraw_image_sizes_t &s = d.sizes;
     const ushort *plane = d.rawdata.raw_image;
@@ -152,8 +126,8 @@ float effective_white(const libraw_data_t &d) {
     return brightest < nominal && brightest > nominal * 0.75f ? (float)brightest : nominal;
 }
 
-// Decides whether the caller can develop the plane itself, and captures what it needs to.
-// Every condition is something the GPU kernel in MetalDevelop.swift assumes.
+// Decides whether the caller can develop the plane itself. Each condition is an assumption
+// of the GPU kernel in MetalDevelop.swift.
 void capture_bayer_state(rik_handle *handle) {
     LibRaw &raw = handle->raw;
     const libraw_data_t &d = raw.imgdata;
@@ -171,12 +145,10 @@ void capture_bayer_state(rik_handle *handle) {
     float highest_black = 0;
     for (int position = 0; position < 4; position++) {
         const int row = position >> 1, col = position & 1;
-        // COLOR() is relative to the picture's top-left pixel and reports the second green
-        // of a cell as colour 3.
+        // COLOR() is relative to the picture's top-left pixel. The second green is colour 3.
         const int c = raw.COLOR(row, col);
         handle->bayer[position] = (uint8_t)(c == 3 ? 1 : c);
-        // Black level has three parts: a base, a per-colour offset, and an optional
-        // repeating pattern whose size is in cblack[4] (rows) and cblack[5] (columns).
+        // Base, per-colour offset, and an optional pattern of cblack[4] rows by cblack[5] columns.
         float black = (float)color.black + (float)color.cblack[c];
         if (color.cblack[4] > 0 && color.cblack[5] > 0)
             black += (float)color.cblack[6 + (row % color.cblack[4]) * color.cblack[5] + col % color.cblack[5]];
@@ -185,18 +157,13 @@ void capture_bayer_state(rik_handle *handle) {
     }
     handle->white = effective_white(d);
 
-    // Not plain enough for the kernel:
-    //   - Phase One format files need per-sensor corrections (quadrant black, defect and
-    //     linearity maps) that only LibRaw's development applies;
-    //   - Fuji SuperCCD sensors are rotated 45 degrees (fuji_width) and some sensors have
-    //     non-square pixels; LibRaw resamples both;
-    //   - a black-level pattern that repeats over more than 2x2 pixels cannot be expressed
-    //     as the four per-position levels the kernel takes.
+    // Left to LibRaw: Phase One per-sensor corrections, Fuji SuperCCD rotation (fuji_width),
+    // non-square pixels, and black-level patterns larger than 2x2.
     bool wide_black_pattern = color.cblack[4] > 2 || color.cblack[5] > 2;
     bool needs_libraw = color.phase_one_data.format != 0 || d.rawdata.ioparams.fuji_width != 0 ||
                         s.pixel_aspect != 1.0 || wide_black_pattern;
-    // A white level at or below black would divide by zero; a non-finite multiplier would
-    // poison every pixel. Both can come straight from a malformed file's tags.
+    // A malformed file can give white at or below black (division by zero) or non-finite
+    // multipliers.
     bool levels_ok = handle->white > highest_black;
     const float *mul = color.cam_mul[0] > 0 && color.cam_mul[1] > 0 ? color.cam_mul : color.pre_mul;
     bool balance_ok = std::isfinite(mul[0]) && std::isfinite(mul[1]) && std::isfinite(mul[2]) &&
@@ -212,7 +179,7 @@ int rik_abi_version(void) { return 1; }
 
 namespace {
 
-// Shared by both ways of opening: `source` hands the bytes to LibRaw.
+// `source` hands the bytes to LibRaw.
 template <typename Source> int open_with(rik_handle **out, Source source) {
     *out = nullptr;
     rik_handle *handle = new (std::nothrow) rik_handle();
@@ -288,8 +255,7 @@ void rik_get_info(rik_handle *handle, rik_info *info) {
     info->focal_length = d.other.focal_len;
     info->timestamp = (int64_t)d.other.timestamp;
 
-    // Before processing these are the sensor's; dcraw_process() rewrites width and height
-    // with the developed image's, which is exactly what a caller asking afterwards wants.
+    // dcraw_process() rewrites width and height with the developed image's.
     info->raw_width = d.sizes.raw_width;
     info->raw_height = d.sizes.raw_height;
     info->width = d.sizes.width;
@@ -310,7 +276,7 @@ void rik_get_info(rik_handle *handle, rik_info *info) {
     info->wb[1] = 1;
     info->wb[2] = mul[2] / green;
 
-    // LibRaw's rgb_cam is 3x4; the fourth column only matters for four-colour sensors.
+    // rgb_cam is 3x4. The fourth column is for four-colour sensors.
     for (int r = 0; r < 3; r++)
         for (int c = 0; c < 3; c++)
             info->rgb_cam[r * 3 + c] = color.rgb_cam[r][c];
@@ -330,7 +296,7 @@ int rik_get_thumbnail(rik_handle *handle, rik_thumbnail *out) {
     bool bitmap = thumb.tformat == LIBRAW_THUMBNAIL_BITMAP && thumb.tcolors == 3;
     if (!thumb.thumb || thumb.tlength == 0 || !(jpeg || bitmap))
         return LIBRAW_UNSUPPORTED_THUMBNAIL;
-    // For a bitmap the caller is about to read width * height * 3 bytes.
+    // A bitmap is read as width * height * 3 bytes.
     if (bitmap && (uint64_t)thumb.twidth * thumb.theight * 3 > thumb.tlength)
         return LIBRAW_UNSUPPORTED_THUMBNAIL;
     out->data = (const uint8_t *)thumb.thumb;
@@ -382,16 +348,15 @@ int rik_get_develop_params(rik_handle *handle, rik_develop_params *out) {
     out->size[0] = d.sizes.width;
     out->size[1] = d.sizes.height;
 
-    // The multipliers are scaled so the *smallest* is 1. Every channel then reaches or
-    // passes 1 when the sensor saturates, and a kernel that clips at 1 after white balance
-    // leaves blown highlights neutral instead of magenta.
+    // Scaled so the smallest multiplier is 1. A kernel that clips at 1 after white balance
+    // then keeps blown highlights neutral.
     const float *mul = color.cam_mul[0] > 0 && color.cam_mul[1] > 0 ? color.cam_mul : color.pre_mul;
     const float smallest = std::min({mul[0], mul[1], mul[2]});
     for (int c = 0; c < 3; c++)
         out->white_balance[c] = mul[c] / smallest;
     out->white_balance[3] = 1;
 
-    // LibRaw's rgb_cam is 3x4; the fourth column only matters for four-colour sensors.
+    // rgb_cam is 3x4. The fourth column is for four-colour sensors.
     float *rows[3] = {out->matrix_row0, out->matrix_row1, out->matrix_row2};
     for (int r = 0; r < 3; r++)
         for (int c = 0; c < 3; c++)
@@ -406,24 +371,21 @@ int rik_process_rgb16(rik_handle *handle, int half_size, rik_rgb16 *out) {
     LibRaw &raw = handle->raw;
 
     if (!handle->processed) {
-        // The aim is the same contract as the GPU path: scene-linear, white-balanced,
-        // sRGB primaries, nothing baked in that an editor would want to control.
+        // Same contract as the GPU path: scene-linear, white-balanced, sRGB primaries.
         libraw_output_params_t &p = raw.imgdata.params;
         p.output_bps = 16;
         p.gamm[0] = 1;        // linear transfer curve
         p.gamm[1] = 1;
-        p.no_auto_bright = 1; // exposure is the caller's decision
+        p.no_auto_bright = 1; // the caller sets exposure
         p.use_camera_wb = 1;
         p.output_color = 1;   // sRGB primaries
-        p.user_flip = 0;      // the caller applies `flip`, as it does on the GPU path
-        p.highlight = 0;      // clip highlights; reconstruction is out of scope
+        p.user_flip = 0;      // the caller applies `flip`
+        p.highlight = 0;      // clip highlights
         p.half_size = half_size ? 1 : 0;
-        // X-Trans: one interpolation pass instead of three. Roughly three times faster and
-        // slightly softer. This path only runs for files Apple's decoder rejects, where a
-        // usable image in six seconds beats a marginally sharper one in eighteen.
+        // X-Trans: one interpolation pass. About three times faster, slightly softer.
         if (raw.imgdata.idata.filters == 9)
             p.user_qual = 2;
-        // LibRaw only bins mosaic sensors; full-colour data ignores half_size.
+        // LibRaw bins mosaic sensors only.
         handle->half_size_applied = half_size && raw.imgdata.idata.filters != 0;
 
         int rc = guarded([&] {

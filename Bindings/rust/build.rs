@@ -1,7 +1,6 @@
 //! Compiles the portable core (LibRaw and the C interface) into this crate.
 //!
-//! The same sources are built by the Swift package (Package.swift) and by CMake
-//! (CMakeLists.txt); the file list and definitions here have to stay in step with them.
+//! The file list and definitions must stay in step with Package.swift and CMakeLists.txt.
 
 use std::path::{Path, PathBuf};
 
@@ -31,7 +30,7 @@ fn main() {
     cc::Build::new()
         .cpp(true)
         .std("c++17")
-        .warnings(false) // LibRaw's own warnings are not ours to fix
+        .warnings(false) // LibRaw's warnings
         .define("USE_ZLIB", None)
         .define("USE_X3FTOOLS", None)
         .include(&libraw)

@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The file browser: a grid of embedded previews, none of which needs a RAW decode.
+/// The file browser: a grid of embedded previews, with no RAW decode.
 struct GalleryView: View {
     @Environment(Library.self) private var library
     @State private var isImporting = false
@@ -31,8 +31,7 @@ struct GalleryView: View {
                 Button("Import", systemImage: "square.and.arrow.down") { isImporting = true }
             }
             .onAppear {
-                // `-openSample 3` on the command line opens the third sample directly, which
-                // is how the README's screenshots are scripted (simctl cannot tap).
+                // `-openSample 3` opens the third sample directly, for scripted screenshots (simctl cannot tap).
                 let index = UserDefaults.standard.integer(forKey: "openSample")
                 if path.isEmpty, library.samples.indices.contains(index - 1) {
                     path = [library.samples[index - 1]]

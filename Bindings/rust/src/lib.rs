@@ -4,18 +4,15 @@
 //! let mut file = rawinput::RawFile::open("photo.arw")?;
 //! println!("{} {}", file.info().make, file.info().model);
 //! file.unpack()?;
-//! let developed = file.develop_cpu(false)?; // works for every file the core can decode
+//! let developed = file.develop_cpu(false)?;
 //! # Ok::<(), rawinput::Error>(())
 //! ```
 //!
-//! What this crate is, and is not. It wraps the core's C interface in safe types: the handle
-//! is closed on drop, and every buffer the core owns is exposed as a borrow that cannot
-//! outlive the file. It does not include Apple's decoder, which only exists on Apple
-//! platforms and is the Swift package's first choice there; on other platforms the core's
-//! own decoding is all there is.
+//! Safe wrappers over the core's C interface. The handle is closed on drop and buffers the
+//! core owns are exposed as borrows. Apple's decoder is not included.
 //!
 //! With the `gpu` feature, [`gpu::Developer`] runs the development kernel (`develop.wgsl`)
-//! through wgpu for plain Bayer files, which is most cameras.
+//! through wgpu for plain Bayer files.
 
 use std::ffi::{CStr, CString};
 use std::path::Path;
@@ -86,7 +83,7 @@ pub struct Info {
     pub make: String,
     pub model: String,
     pub lens: String,
-    /// The decoder's routine for this file: in effect, its compression scheme.
+    /// The decoder's routine for this file.
     pub decoder: String,
     pub layout: SensorLayout,
     /// Size of the picture, before `flip` is applied.
@@ -102,8 +99,8 @@ pub struct Info {
     pub shutter_seconds: f32,
     pub aperture: f32,
     pub focal_length_mm: f32,
-    /// True when the file is a plain Bayer mosaic a GPU kernel can develop from
-    /// `mosaic()` and `develop_params()`. Meaningful after `unpack`.
+    /// True when a GPU kernel can develop the file from `mosaic()` and `develop_params()`.
+    /// Meaningful after `unpack`.
     pub plain_bayer: bool,
 }
 
@@ -135,17 +132,15 @@ pub struct Developed<'a> {
 }
 
 /// A RAW file opened by the core. Closed when dropped.
-///
-/// Not `Sync`: one file is used from one thread at a time. Separate files are independent.
+/// Not `Sync`. Separate files are independent.
 pub struct RawFile {
     handle: *mut sys::Handle,
     unpacked: bool,
-    /// When opened from memory the core reads from these bytes for as long as it lives, so
-    /// the file owns them. Declared after `handle` and dropped after it in `Drop`.
+    /// The core reads from these bytes when opened from memory, so they must outlive `handle`.
     _bytes: Option<Vec<u8>>,
 }
 
-// The handle is owned and has no thread affinity; it may move between threads.
+// The handle has no thread affinity.
 unsafe impl Send for RawFile {}
 
 impl RawFile {
@@ -168,17 +163,16 @@ impl RawFile {
         Ok(Self { handle, unpacked: false, _bytes: None })
     }
 
-    /// The same, for a file already in memory.
+    /// Opens a file already in memory.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
         Self::check_abi()?;
         let mut handle = std::ptr::null_mut();
-        // The Vec's heap buffer does not move when the Vec itself is moved into the struct.
+        // Moving the Vec does not move its heap buffer.
         check(unsafe { sys::rik_open_buffer(bytes.as_ptr().cast(), bytes.len(), &mut handle) })?;
         Ok(Self { handle, unpacked: false, _bytes: Some(bytes) })
     }
 
-    /// Refuses files whose sensor data would need more than this to decode. A frame's size
-    /// comes from the file, so without a limit a damaged header can ask for gigabytes.
+    /// Refuses files whose sensor data would need more than this to decode.
     pub fn set_memory_limit(&mut self, megabytes: u32) {
         unsafe { sys::rik_set_memory_limit(self.handle, megabytes) }
     }
@@ -222,7 +216,7 @@ impl RawFile {
         check(unsafe { sys::rik_get_thumbnail(self.handle, raw.as_mut_ptr()) })?;
         let raw = unsafe { raw.assume_init() };
         Ok(Thumbnail {
-            // The buffer lives until the handle closes; the borrow of `self` keeps it shorter.
+            // The buffer lives until the handle closes.
             bytes: unsafe { std::slice::from_raw_parts(raw.data, raw.length) },
             width: raw.width,
             height: raw.height,
@@ -230,7 +224,7 @@ impl RawFile {
         })
     }
 
-    /// Decompresses the sensor data: the expensive step.
+    /// Decompresses the sensor data. Expensive.
     pub fn unpack(&mut self) -> Result<(), Error> {
         check(unsafe { sys::rik_unpack(self.handle) })?;
         let mut raw = std::mem::MaybeUninit::<sys::Info>::zeroed();
@@ -238,8 +232,7 @@ impl RawFile {
             sys::rik_get_info(self.handle, raw.as_mut_ptr());
             raw.assume_init().data_errors
         };
-        // The decoder keeps going past truncated data and fills the rest with whatever its
-        // state yields. A picture that is partly noise is worse than an error.
+        // The decoder fills the rest of a truncated picture with garbage.
         if errors != 0 {
             return Err(Error::CorruptData);
         }
@@ -267,16 +260,14 @@ impl RawFile {
         })
     }
 
-    /// What a GPU kernel needs to develop the mosaic, or `None` if the file is not a plain
-    /// Bayer mosaic. The struct is the kernel's uniform block as it is.
+    /// The kernel's uniform block, or `None` if the file is not a plain Bayer mosaic.
     pub fn develop_params(&self) -> Option<DevelopParams> {
         let mut params = DevelopParams::default();
         (unsafe { sys::rik_get_develop_params(self.handle, &mut params) } == 0).then_some(params)
     }
 
-    /// The core's own development on the CPU. Works for every file the core can decode,
-    /// and is the only way to develop one that is not a plain Bayer mosaic. Slow: seconds
-    /// for the largest files.
+    /// The core's CPU development. Works for every file the core can decode.
+    /// Slow: seconds for the largest files.
     pub fn develop_cpu(&mut self, half_size: bool) -> Result<Developed<'_>, Error> {
         if !self.unpacked {
             return Err(Error::NotUnpacked);
@@ -297,12 +288,12 @@ impl RawFile {
 
 impl Drop for RawFile {
     fn drop(&mut self) {
-        // Closed here, before `_bytes` is freed: the core may still read from them.
+        // Close before `_bytes` is freed.
         unsafe { sys::rik_close(self.handle) }
     }
 }
 
-/// The decoder library's version, for logs and for anything that must stay reproducible.
+/// The decoder library's version.
 pub fn core_version() -> String {
     unsafe { CStr::from_ptr(sys::rik_libraw_version()) }.to_string_lossy().into_owned()
 }

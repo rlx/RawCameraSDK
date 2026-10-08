@@ -1,13 +1,8 @@
 #!/bin/sh
 # Downloads the sample RAW files listed in Samples/manifest.json into Samples/files and
-# checks each against its SHA-256.
-#
-# Runs as an Xcode build phase and by hand before `swift test`. The files are not in the
-# repository: they total 285 MB, and raw.pixls.us, where they are published under CC0, is
-# the source of truth.
-#
-# Verification is remembered in Samples/files/.verified, so a build after the first one
-# costs a file-timestamp comparison instead of hashing 285 MB.
+# checks each against its SHA-256. The files (285 MB, CC0, from raw.pixls.us) are not in
+# the repository. Runs as an Xcode build phase and by hand before `swift test`.
+# Verification is remembered in Samples/files/.verified, so later builds skip hashing.
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p Samples/files
@@ -15,8 +10,7 @@ stamp=Samples/files/.verified
 list=$(mktemp)
 trap 'rm -f "$list"' EXIT
 
-# One line per sample: file name, checksum, URL. Written to a file first, so that a
-# failure here stops the script; in a pipeline `sh` would carry on with an empty list.
+# File name, checksum, URL per line. Written to a file so a failure here stops the script.
 /usr/bin/python3 - > "$list" <<'PY'
 import json, urllib.parse
 for sample in json.load(open("Samples/manifest.json")):

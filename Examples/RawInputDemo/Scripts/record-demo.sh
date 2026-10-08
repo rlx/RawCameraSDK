@@ -3,8 +3,7 @@
 #
 #     Examples/RawInputDemo/Scripts/record-demo.sh [simulator name]
 #
-# The UI test in UITests/WalkthroughTests.swift drives the app while `simctl` records the
-# screen, so the recording is reproducible and always shows the current build.
+# The UI test in UITests/WalkthroughTests.swift drives the app while `simctl` records.
 set -eu
 cd "$(dirname "$0")/.."
 simulator=${1:-iPhone 17 Pro}

@@ -5,15 +5,10 @@ import RawInputKit
 
 /// State for one open file: the decoded image, what is on screen, and the work in flight.
 ///
-/// Two things arrive asynchronously and out of order: decodes (seconds) and renders (tens
-/// of milliseconds, one per slider movement). The rules that keep the screen truthful:
-///
-/// - **A decode belongs to a generation.** Choosing another decoder starts a new
-///   generation, and a result from an older one is dropped on arrival.
-/// - **One render at a time, always of the latest request.** Slider movements do not queue
-///   renders. A single loop renders the current exposure and look, then checks whether
-///   either changed meanwhile. However fast the slider moves, the last value is the one
-///   left on screen.
+/// - A decode belongs to a generation. Choosing another decoder starts a new one, and
+///   results from older generations are dropped.
+/// - One render runs at a time. A single loop renders the current exposure and look,
+///   then repeats if either changed meanwhile.
 @MainActor
 @Observable
 final class DetailModel {
@@ -51,8 +46,7 @@ final class DetailModel {
         preview = await Develop.thumbnail(url)
     }
 
-    /// - Parameter sceneLinear: see `Develop.open`. Changing it means decoding again, because
-    ///   it changes what Apple's decoder is asked for.
+    /// - Parameter sceneLinear: see `Develop.open`. Changing it means decoding again.
     func decode(_ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool) async {
         generation += 1
         let mine = generation
@@ -78,20 +72,18 @@ final class DetailModel {
     }
 
     private func renderUntilCurrent() async {
-        // If a loop is already running it will notice the change itself.
+        // A running loop picks up the change.
         guard !isRendering else { return }
         isRendering = true
         defer { isRendering = false }
 
         while let raw, shown != wanted {
             let request = wanted
-            // A look needs scene-linear data. While the decode that will supply it is still
-            // on its way, the image in hand is Apple's finished rendering; show it as it is
-            // instead of stacking a second tone curve on top.
+            // A look needs scene-linear data. Until that decode arrives, show Apple's finished
+            // rendering unchanged.
             let look = raw.isSceneLinear ? request.look : nil
             let image = await Develop.render(raw, look: look, exposureEV: request.exposure)
-            // The decoder was switched while this rendered: the image belongs to a file
-            // state that is gone. Go round again with whatever is current now.
+            // The decoder was switched while this rendered. Render again with the current state.
             guard request.generation == generation else { continue }
             guard let image else {
                 failure = RawError.renderFailed(reason: "nothing was drawn").localizedDescription

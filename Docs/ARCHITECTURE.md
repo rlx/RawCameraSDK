@@ -1,45 +1,26 @@
 # Architecture
 
-A guide for someone opening this repository for the first time. It explains how the code is
-organised, the decisions that are not obvious from reading it, and how to do the jobs you
-are most likely to be asked to do. The README covers what the project is for and what was
-measured; [RECOMMENDATION.md](RECOMMENDATION.md) says what I would do with the findings.
+How the code is organised and the decisions that are not obvious from reading it.
+Build and measurement commands are in [BUILDING.md](BUILDING.md).
 
-## The idea in one paragraph
-
-Apple ships a RAW decoder (`CIRAWFilter`) that handles most cameras and is the best result
-when it works. It does not open everything. RawInputKit puts a second decoder behind it,
-built on LibRaw, and gives callers one function that tries Apple first and falls back when
-it has to. The engineering is in three places: knowing reliably when Apple's decoder will
-*not* work, developing LibRaw's sensor data into an image quickly, and proving with
-measurements which files each decoder really handles.
-
-## Map of the repository
+## Layout
 
 ```
-Package.swift                  five targets, described below
-CMakeLists.txt                 the same core for C hosts and for WebAssembly
-Vendor/LibRaw/                 LibRaw 0.22.2, unmodified, a git submodule
+Package.swift                  SwiftPM targets
+CMakeLists.txt                 the core for C hosts and WebAssembly
+Vendor/LibRaw/                 LibRaw 0.22.2, unmodified submodule
 Sources/
-  RawShim/                     the portable core's C interface   (C++, no Apple APIs)
-  RawInputKit/                 the library                       (Swift)
-  rawprobe/                    measuring tools                   (Swift, macOS command line)
-Shaders/develop.wgsl           the development kernel in WGSL
-Conformance/                   cases every edition of the kernel must pass
-Bindings/
-  rust/                        the core as a Rust crate, with the WGSL kernel under wgpu
-  web/                         the core as WebAssembly, with a JavaScript wrapper
-  c/                           a C smoke test of the core
+  RawShim/                     C interface over LibRaw (C++, no Apple APIs)
+  RawInputKit/                 the library (Swift)
+  rawprobe/                    measurement tools (Swift, macOS command line)
+Shaders/develop.wgsl           development kernel in WGSL
+Conformance/                   test cases shared by the Metal and WGSL kernels
+Bindings/                      rust/, web/, and a C smoke test
 Tests/RawInputKitTests/        Swift Testing suites
-Tests/corpus-pool.json         the 944 archive files the probe runs over
-Tests/probe-results.json       what the probe found; input to the docs and charts
-Tests/bench-results.json       speed and memory measurements
+Tests/*.json                   corpus list and measurement results
 Examples/RawInputDemo/         SwiftUI app for iOS and macOS
-Scripts/                       corpus download, coverage report, charts
-Docs/                          this file, coverage.md, charts and screenshots
+Scripts/                       corpus download, coverage report, charts, device runs
 ```
-
-### Targets and what depends on what
 
 ```
 rawprobe ─┐
@@ -48,264 +29,183 @@ demo app ─┘        │
                    └─▶ Core Image, Metal, ImageIO
 ```
 
-- **CLibRaw** compiles LibRaw's sources as they are. Three placeholder files are excluded
-  and two features switched on (zlib for compressed DNG, X3F for Sigma Foveon); see
-  `Package.swift`.
-- **RawShim** is the only code that includes LibRaw headers. Together with LibRaw it is the
-  portable core: it must not use anything from an operating system or a GPU API, because
-  the Rust crate and the WebAssembly build compile the same files. [PORTING.md](PORTING.md)
-  describes those bindings.
-- **RawInputKit** is the only Swift code that imports RawShim. No LibRaw or shim type
-  appears in its public API; an error from the fallback carries the decoder's status code
-  for diagnosis and nothing else.
+- `CLibRaw` compiles LibRaw unchanged, with zlib (compressed DNG) and X3F (Sigma Foveon)
+  enabled.
+- `RawShim` is the only code that includes LibRaw headers. With LibRaw it forms the
+  portable core that the Rust and WebAssembly builds also compile, so it must not use OS
+  or GPU APIs. See [PORTING.md](PORTING.md).
+- `RawInputKit` is the only Swift code that imports `RawShim`. No LibRaw type appears in
+  its public API.
 
-## Reading order
+## Where to start
 
-If you read these six files in this order, you have read the product:
-
-| File | What it holds |
+| File | Contents |
 |---|---|
-| `RawInputKit/RawInput.swift` | The public entry points and the routing decision |
-| `RawInputKit/AppleRawDecoder.swift` | The Apple route, and the probe that decides routing |
-| `RawShim/include/RawShim.h` | The contract with LibRaw: lifecycle, ownership, field meanings |
-| `RawShim/RawShim.cpp` | How that contract is met, and LibRaw's traps |
-| `RawInputKit/FallbackRawDecoder.swift` | The two fallback paths and how a file is assigned to one |
-| `RawInputKit/MetalDevelop.swift` | The GPU kernel: levels, demosaic, colour |
+| `RawInputKit/RawInput.swift` | Public entry points and routing |
+| `RawInputKit/AppleRawDecoder.swift` | The Apple route and the support check |
+| `RawShim/include/RawShim.h` | The C interface: lifecycle, ownership, fields |
+| `RawShim/RawShim.cpp` | Its implementation and LibRaw's pitfalls |
+| `RawInputKit/FallbackRawDecoder.swift` | The two fallback paths |
+| `RawInputKit/MetalDevelop.swift` | The GPU kernel |
 
-The rest of the library is supporting types: `RawImage`, `RawInfo`, `RawDecodeOptions`,
-`RawError`, `RawEvent` (the public vocabulary), `AppleSupport` (remembers which kinds of
-file Apple's decoder handles), `LibRawFile` (lifetime-safe wrapper over the shim),
-`RawPreview`, `RawImage+Texture` (the hand-off to a Metal engine), and three pieces that
-sit *after* the decoders: `ExposureEstimate` (default brightness),
-`PreviewAgreement` (is the fallback's colour believable?) and `RawLook` (the shared
-rendering step).
+Applied after decoding: `ExposureEstimate` (default brightness), `PreviewAgreement` (the
+colour check) and `RawLook` (shared rendering).
 
-## What happens when a file is opened
+## Opening a file
 
 ```
 RawInput.open(url)
    │
-   ├─ AppleSupport.canDecode ───── known for this camera and mode? else render a small
-   │                               region with Apple's engine: did pixels come out?
+   ├─ AppleSupport.canDecode ───── cached for this camera and mode, or render a small
+   │                               region with Apple's engine and check for pixels
    │
    ├─ yes ─ AppleRawDecoder.decode ───────────────────────────────┐
-   │          a configured CIRAWFilter; lazy                      │
    │                                                              ├─▶ RawImage
    └─ no ── FallbackRawDecoder.decode                             │
-              LibRawFile(url).unpack()   decompress sensor data   │
+              LibRawFile(url).unpack()                            │
               ├─ rik_info.plain_bayer ─▶ MetalDevelop.develop ────┤   GPU path
               └─ otherwise ───────────▶ LibRaw dcraw_process ─────┘   CPU path
 
-RawImage ─▶ rendered(look:) ─▶ a picture     exposure, then one lookup table; identical
-                                             for both routes
+RawImage ─▶ rendered(look:)        exposure, then one lookup table
 ```
 
-### Why routing decodes instead of looking the camera up
+### Routing
 
-Whether Apple supports a file depends on the camera *and* the compression mode, changes
-with each OS update, and is not something Apple's API reports. Worse, `CIRAWFilter` is lazy:
-for a camera it knows in a mode it does not, it can return an image that only turns out to
-be empty when rendered. So `AppleRawDecoder.canDecode` asks for real pixels: a 64-pixel
-square from the middle of the frame.
+Apple's API does not report whether it supports a file. Support depends on camera and
+compression mode and changes with OS updates, and `CIRAWFilter` can return an image that
+renders empty. `AppleRawDecoder.canDecode` therefore renders a 64-pixel square from the
+middle of the frame.
 
-That is not cheap. Apple's engine still decompresses the sensor data up to that region, and
-scaling the picture down instead saves nothing because the engine demosaics everything
-before it shrinks. Measured on a Mac in a fresh process, opening through the check takes
-0.1 to 0.7 s longer than calling Apple's decoder directly. Paying that on every open would
-add a large fraction to the cost of the files Apple supports. `AppleSupport` therefore keys the answer on
-camera model, LibRaw's decoding routine and frame size, tests the first file of each kind,
-and reuses a "yes" for the rest of the process's life. A "no" is never remembered: it can
-be a fact about one damaged file, and keeping it would send every later file from that
-camera to the fallback.
+The check adds 0.1 to 0.7 s on a Mac, because Apple's engine decompresses the sensor data
+up to that region. `AppleSupport` caches a positive answer per camera model, decoding
+routine and frame size. A negative answer is not cached, since it may come from one
+damaged file.
 
-### Why there are two fallback paths
+### Fallback paths
 
-LibRaw can do the whole job on the CPU, and for unusual sensors it should: its pipeline
-knows per-camera corrections its authors collected camera by camera. But it is
-single-threaded, and seconds per frame where a GPU needs tenths. (The best-known demosaic
-algorithms, AMaZE and RCD, are GPL and are in neither LibRaw's shipped tree nor this
-project.) Plain Bayer sensors are the bulk of real files and need nothing camera-specific
-beyond numbers LibRaw hands over (black level, white level, white balance, a 3x3 matrix), so
-for those LibRaw only decompresses and a Metal kernel does the rest.
+LibRaw's CPU pipeline handles every sensor type but is single-threaded and takes seconds
+per frame. Plain Bayer files need only black level, white level, white balance and a 3x3
+matrix, so for those LibRaw decompresses and a GPU kernel develops.
 
-The core decides which path a file takes, in `capture_bayer_state`. A file is `plain_bayer`
-only if every assumption the kernel makes holds, and for those the core also computes the
-kernel's parameter block (`rik_get_develop_params`), so the Metal kernel here and the WGSL
-kernel in the Rust crate develop with the same numbers. When in doubt it is not, and the CPU path
-runs. If the GPU itself fails, the CPU path runs then too.
+`capture_bayer_state` in the core sets `plain_bayer` when every assumption of the kernel
+holds, and `rik_get_develop_params` computes the kernel's parameters so the Metal and WGSL
+kernels use the same values. Other files, and any GPU failure, go to the CPU path.
 
-### Why rendering is a separate step after both decoders
+### Shared rendering
 
-A decoder should stop at scene-linear data, and nobody should be shown scene-linear data.
-If each route turned it into a picture its own way (Apple with Apple's tone curve, the
-fallback with something else), a gallery would contain two visibly different kinds of
-photograph, sorted by which decoder happened to open each file.
+Both decoders return scene-linear data and `RawLook` turns it into a picture:
 
-So everything that shapes the picture happens in one place, `RawLook`, after the decoders:
+1. Exposure, from `ExposureEstimate.measure`, which reads the pixels and is the same for
+   both routes. It is automatic exposure and would flatten a bracketed series.
+2. The look: contrast curve, saturation, tints and fade in a 33-point 3D lookup table,
+   applied with `CIColorCubeWithColorSpace`.
 
-1. **Exposure**, measured from the pixels by `ExposureEstimate.measure`, the same function
-   for both routes. Each decoder has its own idea of where sensor white sits, so neither's
-   calibration constants are comparable with the other's; the picture is. This is automatic
-   exposure, with the drawback that has: it flattens a bracketed series. A product would
-   use a calibrated baseline per camera.
-2. **The look**: a contrast curve, saturation, tints and fade, baked into a 33-point 3D
-   lookup table and applied with `CIColorCubeWithColorSpace`.
+Apple's decoder must be opened with `appleRendering = .linear` for the two routes to match.
+`RawImage.isSceneLinear` reports it.
 
-To get matching pictures from both routes, Apple's decoder has to be asked for scene-linear
-output (`appleRendering = .linear`); `RawImage.isSceneLinear` says whether an image is.
-`rawprobe match` measures the result. Across 202 files the routes' default outputs differ
-by a median ΔE of about 11; their scene-linear data at measured exposure differs by about
-3, and stays there through a look. So it is the linear data and the common exposure
-measurement that bring the routes together, not the look. What remains is real (different
-colour matrices, Apple's lens corrections and noise reduction) and is the next thing to
-work on if the routes must be indistinguishable.
+### Colour check
 
-### How the fallback knows when it is wrong
+LibRaw decodes some cameras with wrong colours, usually ones newer than its tables.
+`PreviewAgreement` compares the fallback's result with the embedded preview by
+chromaticity on a 24x16 grid. The distance is in `RawImage.previewDistance`, and
+`isColorSuspect` is true above 0.15. The image is still returned so the caller can decide
+what to do with it.
 
-LibRaw decodes some cameras incorrectly instead of refusing them, typically ones newer
-than its tables: the file opens, pixels come out, and the picture has a colour cast. The
-fallback therefore compares its result with the preview the camera embedded in the same
-file (`PreviewAgreement`), on a 24x16 grid, by chromaticity only. The distance goes into
-`RawImage.previewDistance`; above 0.15, `isColorSuspect` is true.
+### Events, limits, cancellation
 
-It reports instead of refusing, because the right response belongs to the caller: a viewer
-should badge the picture, an importer might reject it, and a tinted picture can still be
-better than none. The demo badges it.
+`RawDecodeOptions.eventHandler` receives a `RawEvent` when Apple rejects a file, when the
+GPU path fails, when colour is suspect, and when a file has been opened.
+`fallbackMemoryLimitMB` refuses a file whose header asks for too much memory. `isCancelled`
+is polled between decoding stages.
 
-### What the library tells its caller
+## Conventions
 
-A decoder that quietly falls back, or quietly returns a picture it has doubts about, is
-invisible in production. `RawDecodeOptions.eventHandler` receives a `RawEvent` when Apple's
-decoder turns a file away (with the camera and compression scheme), when the GPU path
-fails and the CPU path takes over, when the fallback's colour is suspect, and when a file
-has been opened. That is the hook an app would log from to learn how often, and for which
-cameras, the fallback is needed at all.
+**Output.** Both routes return an upright, linear-light `CIImage`. The fallback's is
+scene-linear with sRGB primaries, clipped at 1. See the doc comment on `RawImage.image`.
 
-Two more options exist for the same reason, that the input is not trusted and the user may
-have moved on: `fallbackMemoryLimitMB` refuses a file whose header asks for more memory
-than allowed, and `isCancelled` is polled between decoding stages so a slow file can be
-abandoned.
+**Coordinates.** LibRaw's sensor plane includes masked borders. Per-position data (colour
+pattern, black levels) is indexed from the picture's top-left pixel as
+`(row & 1) * 2 + (column & 1)`. The kernel adds the origin when it reads the texture.
 
-## Conventions worth knowing before you change anything
+**Orientation.** `FallbackRawDecoder` applies the camera's orientation once, at the end.
+`RawInfo.width` and `height` describe the unrotated frame.
 
-**The output contract.** Both routes return an upright, linear-light `CIImage`. The fallback
-is scene-linear with sRGB primaries, highlights clipped at 1, no tone curve. Apple's carries
-Apple's look. They are interchangeable as *inputs to an editor*, not visually identical; the
-doc comment on `RawImage.image` spells out the differences, including what backs each image.
+**Vertical flips.** Metal's first row is the top and Core Image's origin is the bottom, so
+`MetalDevelop` flips its result. Bitmap data passed to Core Image is not flipped.
 
-**Coordinates.** LibRaw's sensor plane includes masked borders. The *picture* is a rectangle
-inside it. Everything indexed "per mosaic position" (colour pattern, black levels) is
-relative to the picture's top-left pixel: `(row & 1) * 2 + (column & 1)`. The kernel adds
-the origin only when it reads the texture.
+**Buffer lifetime.** Pointers from the core are valid until the handle closes. `LibRawFile`
+exposes buffers only inside closures (`withMosaic`, `withDeveloped`, `withThumbnail`). Do
+not add an accessor that returns a pointer.
 
-**Orientation.** Neither fallback path rotates. `FallbackRawDecoder` applies the camera's
-orientation once, at the end, with `CIImage.oriented`. `RawInfo.width/height` describe the
-unrotated frame.
+**Parameter block.** `rik_develop_params`, `MetalDevelop.Parameters`, and `Params` in both
+shaders are the same 128 bytes. Change all four together.
 
-**Vertical flips.** A Metal texture's first row is the top; Core Image's origin is the
-bottom. `MetalDevelop` flips its result. Bitmap data handed to Core Image is already read
-top-first and is not flipped. `KernelTests.topOfPictureIsTopOfImage` pins this.
+**LibRaw state.** A `LibRaw` object rewrites its own fields as calls are made. The core
+captures what it needs at unpack time. `RawShim.cpp` lists which call makes which field
+valid.
 
-**Buffer lifetime.** Pointers from the shim are valid until the handle closes, and Swift may
-destroy an object after its last use, before the end of scope. `LibRawFile` therefore only
-exposes buffers inside closures (`withMosaic`, `withDeveloped`, `withThumbnail`). Do not add
-an accessor that returns a pointer.
+**Deferred rendering.** `CIContext.createCGImage` returns before rendering by default.
+Code that measures or checks a render uses `RawMeasurement.renderFully` or passes
+`deferred: false`.
 
-**The kernel's parameter block.** `rik_develop_params` in the core, `MetalDevelop.Parameters`
-in Swift, `Params` in the Metal source and `Params` in `Shaders/develop.wgsl` are the same
-128 bytes. Change all four together. The core asserts its size, `parameterLayoutMatchesShader`
-pins the Swift offsets, and the conformance cases fail if either shader disagrees.
-
-**LibRaw's mutable state.** A `LibRaw` object rewrites its own fields as calls are made
-(`dcraw_process` changes width, height and flip). The shim captures what it needs at unpack
-time. The comment at the top of `RawShim.cpp` lists which call makes which field valid.
-
-**Core Image is lazy, twice over.** A `CIImage` does nothing until rendered, and
-`CIContext.createCGImage` by default returns before rendering too, doing the work when the
-image's pixels are first read. Anything that needs to *know* a render happened, such as a
-measurement or a check for an empty result, renders into a bitmap it owns
-(`RawMeasurement.renderFully`) or passes `deferred: false`. An early version of the
-benchmark got this wrong and reported Apple's decoder as several times faster than it is.
-
-**Hostile input.** RAW files come from cards, downloads and other people. Every size, margin
-and level that reaches the kernel is validated in the shim first; non-finite values are
-dropped before they reach integer conversion; data LibRaw reports as corrupt becomes
-`RawError.corruptData` instead of being developed into noise. LibRaw does not report a
-short read of an uncompressed format, so those truncated files still decode, with the
-missing rows empty. Catching that needs a datastream that notices short reads.
+**Untrusted input.** Sizes, margins and levels are validated in the core before they reach
+the kernel. Data LibRaw reports as corrupt becomes `RawError.corruptData`. LibRaw does not
+report a short read of an uncompressed format, so those files decode with empty rows.
 
 ## Tests
 
-`swift test` runs everything. Suites that need files that are not there skip themselves
-with a message saying how to fetch them. `Scripts/device-tests.sh` runs the same sources on a physical device,
-hosted in the demo app (the `RawInputDemoTests` target), since a device cannot run a
-package's tests directly; `Fixtures.swift` explains where the files come from there.
+`swift test` runs everything. Suites skip themselves when their files are missing and print
+how to fetch them. `Scripts/device-tests.sh` runs the same sources on a device, hosted in
+the demo app.
 
-| Suite | Needs | What it pins |
+| Suite | Needs | Covers |
 |---|---|---|
-| Metal kernel | a GPU | Demosaic, pattern indexing, origin, flips and clipping, on hand-built mosaics with known answers, including the conformance cases shared with the WGSL kernel |
-| Exposure estimate, Metadata | nothing | Small pure functions, including the non-finite input that would otherwise crash |
-| Looks | nothing | The look's maths (monotonic, neutral greys stay neutral), its lookup-table layout, and that Core Image applies what the maths says |
-| Preview agreement | nothing | A colour cast or a flipped picture is flagged; a brightness change alone is not |
-| Robustness | nothing (truncation uses the samples) | Missing, empty and random files are refused with an error; truncated files do not crash (whether they are refused depends on the format, see the README's limits) |
-| Bundled samples | `fetch-samples.sh`, 285 MB | Each of the ten fails on Apple, develops on the fallback, and passes the fallback's own colour check; events, cancellation and the memory limit behave as documented |
-| Decoder agreement | the same, plus `corpus.py fetch --only DMC-LX10_-_1_1`, 22 MB | The two routes agree on size, colour and in-camera crop, come closer together through the shared rendering, and both render into a Metal texture |
+| Metal kernel | a GPU | Demosaic, pattern indexing, origin, flips and clipping on synthetic mosaics, including the shared conformance cases |
+| Exposure estimate, Metadata | nothing | Pure functions, including non-finite input |
+| Looks | nothing | Curve properties, lookup-table layout, agreement with Core Image |
+| Preview agreement | nothing | Flags a colour cast or a flipped picture, ignores brightness |
+| Robustness | nothing (truncation uses the samples) | Missing, empty, random and truncated files |
+| Bundled samples | `fetch-samples.sh`, 285 MB | Each sample fails on Apple and develops on the fallback; events, cancellation, memory limit |
+| Decoder agreement | the same, plus `corpus.py fetch --only DMC-LX10_-_1_1` | Size, colour and crop agree between routes; texture output |
 
-The kernel tests exist because real photographs cannot catch the bugs that matter there: an
-image developed with the Bayer pattern off by one pixel, or upside down, still looks like a
-photograph.
+Outside `swift test`:
 
-Two more kinds of test live outside `swift test`:
+- `Examples/RawInputDemo/UITests` drives the demo in the simulator.
+  `Scripts/record-demo.sh` records it for the README.
+- `rawprobe fuzz FILE...` decodes damaged copies of files in child processes and keeps
+  inputs that crash or hang in `fuzz-findings/`.
+- `cargo test --features gpu` in `Bindings/rust`, and `node Bindings/web/test.mjs`.
 
-- **The UI walkthrough** (`Examples/RawInputDemo/UITests`) drives the demo through its
-  whole story in the simulator. `Scripts/record-demo.sh` records it; that is where the
-  README's GIF comes from.
-- **Fuzzing.** `rawprobe fuzz FILE...` decodes seeded, damaged copies of real files, each
-  in a child process, and keeps any input that crashes or hangs in `fuzz-findings/`. It is
-  cheap mutation fuzzing aimed at our own handling of sizes, margins and levels, not a
-  replacement for coverage-guided fuzzing of LibRaw.
+CI runs the Swift tests, builds the demo for iOS, and builds and tests the Rust crate and
+the WebAssembly module, on macOS and Linux.
 
-The bindings have their own tests: `cargo test --features gpu` in `Bindings/rust` and
-`node Bindings/web/test.mjs`.
+`appleRejectsIt` fails when an OS update adds support for a sample's format. Replace the
+sample with another from the fallback-only list in `Docs/coverage.md`.
 
-CI (`.github/workflows/ci.yml`) builds the package, runs `swift test` with the sample
-files (but not the crop-test file, so that one test skips), builds the demo for iOS, and
-builds and tests the Rust crate and the WebAssembly module, for pushes to `main` and pull
-requests.
+## Tasks
 
-`appleRejectsIt` will start failing when an OS update teaches Apple's decoder one of the
-sample formats. That is expected: swap the sample for another file from
-`Docs/coverage.md`'s fallback-only list and update the README.
-
-## How to
-
-### Look at one file
+### Inspect one file
 
 ```sh
-swift run -c release rawprobe render FILE out.jpg            # as the app would route it
+swift run -c release rawprobe render FILE out.jpg            # automatic routing
 swift run -c release rawprobe render FILE out.jpg fallback   # force a route
 swift run -c release rawprobe compare FILE out.jpg           # both routes side by side
-swift run -c release rawprobe looks FILE out.jpg             # both routes through the shared looks
+swift run -c release rawprobe looks FILE out.jpg             # both routes through the looks
 ```
 
-### Debug a decode that looks wrong
+### Debug a wrong-looking decode
 
-1. `rawprobe render FILE out.jpg fallback` prints the path taken ("+ Metal" or "CPU"), the
-   size and the suggested exposure.
-2. Wrong colours on the **Metal** path: almost always black level, white level or white
-   balance. Print the `rik_info` from `FallbackRawDecoder.decode`. A pink or green haze over
-   the whole frame is a wrong black level, usually because the camera is newer than LibRaw's
-   tables. Magenta highlights are a white level set too high.
-3. Wrong colours on the **CPU** path are LibRaw's. Compare with LibRaw's own
-   `dcraw_emu` to confirm, then decide whether the file should be refused.
-4. Wrong framing: check `apply_camera_crop` in the shim and the file's `raw_inset_crops`.
-5. Read `RawImage.previewDistance` (the demo shows a warning, the probe prints it): above
-   0.15 means the result disagrees with the camera's own rendering.
+1. `rawprobe render FILE out.jpg fallback` prints the path, size, exposure and preview
+   distance.
+2. On the GPU path, check black level, white level and white balance in `rik_info`. A pink
+   or green haze means a wrong black level. Magenta highlights mean the white level is
+   too high.
+3. On the CPU path, compare with LibRaw's `dcraw_emu`.
+4. For wrong framing, check `apply_camera_crop` and the file's `raw_inset_crops`.
 
-### Move a camera from the Metal path to the CPU path
+### Send a camera to the CPU path
 
-Add its condition to `needs_libraw` in `capture_bayer_state`, with a comment saying what
-correction it needs. That is how Phase One files are handled.
+Add its condition to `needs_libraw` in `capture_bayer_state`, as for Phase One.
 
 ### Update LibRaw
 
@@ -313,60 +213,27 @@ correction it needs. That is how Phase One files are handled.
 cd Vendor/LibRaw && git fetch --tags && git checkout <tag>
 ```
 
-Then check `Package.swift`'s exclusions against LibRaw's `Makefile.devel` (placeholder files
-are named `*_ph.cpp`), run `swift test`, rerun the probe and compare `Docs/coverage.md`
-before and after. LibRaw must stay unmodified: the licence position in
-`THIRD-PARTY-NOTICES.md` depends on it.
+Check the exclusions in `Package.swift` against LibRaw's `Makefile.devel`, run the tests,
+rerun the probe and compare `Docs/coverage.md`. LibRaw must stay unmodified. See
+`THIRD-PARTY-NOTICES.md`.
 
-### Regenerate the numbers, tables and charts
+## Demo app
 
-```sh
-Scripts/corpus.py fetch                                                    # 19 GB, once
-swift run -c release rawprobe Tests/Corpus --json Tests/probe-results.json # about 6 minutes
-swift run -c release rawprobe bench FILES... --json Tests/bench-results.json
-swift run -c release rawprobe match FILES... --json Tests/match-results.json
-Scripts/coverage.py     # Docs/coverage.md
-Scripts/charts.py       # Docs/*.svg
-```
+A gallery of embedded previews and a detail view with a decoder picker, a look picker and
+an exposure slider.
 
-Apple's column depends on the OS the probe runs on. Rerun it after a major OS release.
+- `Develop.swift` runs the library's blocking calls on its own dispatch queue.
+- `DetailModel.swift` discards results that arrive after a newer request and renders one
+  frame at a time with the latest slider value.
 
-For device numbers, install the Release build of the demo and run
-`Scripts/device-bench.py <udid>` (15 app launches by default; `--limit 0 --runs 3` for
-the full set). It writes `Tests/device-results.json`, which
-`Scripts/charts.py` also reads. The demo has a headless mode for this
-(`App/Benchmark.swift`): one file, one route, one line of JSON, exit.
+The Xcode project is generated from `project.yml` with XcodeGen and committed. A build
+phase downloads the sample files.
 
-## The demo app
+## Not implemented
 
-`Examples/RawInputDemo` is small: a gallery of embedded previews and a detail
-view with a decoder picker and an exposure slider. Two files carry its logic.
-
-- `Develop.swift` moves RawInputKit's blocking calls onto a dispatch queue of their own, so
-  multi-second decodes do not occupy Swift's cooperative thread pool.
-- `DetailModel.swift` keeps the screen truthful when results arrive out of order. Decodes
-  are tagged with a generation and dropped if a newer one has started; renders run one at a
-  time in a loop that always renders the latest slider value and look. Its header comment
-  states the two rules.
-
-The detail view has two pickers. The first chooses the decoder. The second chooses what
-happens after it: "Decoder" shows the decoder's own output, "Neutral" and "Film" apply a
-shared `RawLook`. One bundled file opens in both decoders, so the effect can be seen by
-flipping the first picker under each setting of the second.
-
-The Xcode project is generated from `project.yml` with XcodeGen and committed, so the tool
-is only needed to change project settings. A build phase downloads the sample files.
-
-## What is not here
-
-- **A finished look.** `RawLook` is a tone curve and a simple style, enough to make the two
-  routes interchangeable. There is no lens correction, noise reduction or highlight recovery
-  on the fallback, and those are most of what still separates it from Apple's route.
-- **Wide-gamut output.** The fallback converts to sRGB primaries and clips at 1. A RAW file
-  has more gamut and highlight range than that keeps.
-- **Tiled development.** The GPU path develops a whole frame into one texture, which is why
-  very large frames are halved. `CIImageProcessorKernel` is the route to lifting that.
-- **A GPU X-Trans path.** Fujifilm's mosaic goes through LibRaw on the CPU, at seconds per
-  frame. Apple opens almost all X-Trans files, so it rarely runs.
-- **Nikon High Efficiency and JPEG XL DNG.** Both need codecs LibRaw does not include.
-  Apple's decoder opens them, so automatic routing handles them.
+- Lens correction, noise reduction and highlight recovery on the fallback.
+- Wide-gamut output. The fallback converts to sRGB primaries and clips at 1.
+- Tiled development. The GPU path develops a frame into one texture, so very large frames
+  are halved.
+- X-Trans on the GPU.
+- Nikon High Efficiency and JPEG XL DNG on the fallback. Apple's decoder opens both.

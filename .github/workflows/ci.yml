@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
 
-# A newer push to the same branch makes the older run pointless.
+# A newer push to the same branch cancels the older run.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -13,8 +13,8 @@ concurrency:
 jobs:
   swift:
     name: Swift package and demo
-    # GitHub's Xcode 27 image, the toolchain the project is developed with. It is a preview
-    # image; move to the macOS label that carries Xcode 27 once one is generally available.
+    # GitHub's Xcode 27 preview image. Move to the macOS label that carries Xcode 27 once
+    # one is generally available.
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -22,8 +22,7 @@ jobs:
         with:
           submodules: recursive   # LibRaw
 
-      # The sample RAW files are 285 MB from a volunteer-run archive; fetch them once per
-      # manifest revision, not once per run.
+      # The sample RAW files are 285 MB. Fetch them once per manifest revision.
       - name: Restore sample files
         uses: actions/cache@v4
         with:
@@ -46,14 +45,14 @@ jobs:
             -project Examples/RawInputDemo/RawInputDemo.xcodeproj -scheme RawInputDemo \
             -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet
 
-      # The Rust crate with its WGSL kernel, on the same machine so it has a GPU to run on.
+      # The Rust crate with its WGSL kernel, here because this machine has a GPU.
       - name: Rust crate
         working-directory: Bindings/rust
         run: cargo test --features gpu
 
   portable:
     name: Portable core on Linux, and WebAssembly
-    # Not a Mac on purpose: the core claims to need nothing from Apple, and this is the check.
+    # Linux, to check that the core needs nothing from Apple.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -77,7 +76,7 @@ jobs:
           cmake --build .build/cmake -j 4
           ctest --test-dir .build/cmake --output-on-failure
 
-      # The decoder only: a hosted Linux runner has no GPU for the WGSL kernel.
+      # The decoder only. A hosted Linux runner has no GPU for the WGSL kernel.
       - name: Rust crate
         working-directory: Bindings/rust
         run: cargo test

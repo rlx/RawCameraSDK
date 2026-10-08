@@ -3,7 +3,6 @@ import Foundation
 import RawInputKit
 
 /// `rawprobe render`: develops one file and saves a JPEG of what the demo app would show.
-/// The quickest way to look at a decode without launching anything.
 enum Render {
     static func run(input: URL, output: URL, route: String?) throws {
         var options = RawDecodeOptions()

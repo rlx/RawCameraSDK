@@ -3,12 +3,9 @@
 #
 #     Scripts/device-tests.sh <device-udid> <development-team-id>
 #
-# `xcrun devicectl list devices` shows the UDID. The team ID is the ten-character code of
-# the Apple developer team that signs the build; a free personal team works.
-#
-# A device cannot run a Swift package's tests directly, so the same test sources are built
-# into a bundle hosted by the demo app (the RawInputDemoTests target). The demo's own files
-# ride along inside the app; the crop-test file is copied into its Documents folder here.
+# `xcrun devicectl list devices` shows the UDID. A free personal team works.
+# The tests are built into a bundle hosted by the demo app (the RawInputDemoTests target).
+# The crop-test file is copied into the app's Documents folder here.
 set -eu
 device=$1
 team=$2

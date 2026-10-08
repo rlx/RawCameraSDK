@@ -1,8 +1,8 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// RawInputKit: camera RAW decoding for iOS and macOS, Apple's decoder first and LibRaw
-// behind it. Docs/ARCHITECTURE.md explains how the targets fit together.
+// RawInputKit: camera RAW decoding for iOS and macOS, Apple's decoder first, then LibRaw.
+// See Docs/ARCHITECTURE.md.
 let package = Package(
     name: "RawInputKit",
     platforms: [.iOS(.v17), .macOS(.v14)],
@@ -11,21 +11,18 @@ let package = Package(
         .executable(name: "rawprobe", targets: ["rawprobe"]),
     ],
     targets: [
-        // LibRaw 0.22.2, compiled from the submodule exactly as upstream ships it. It is used
-        // under its CDDL-1.0 option, which requires that its files stay unmodified or that
-        // changes to them be published; see THIRD-PARTY-NOTICES.md before editing anything
-        // under Vendor/.
+        // LibRaw 0.22.2 from the submodule, under CDDL-1.0: its files stay unmodified or changes
+        // are published. See THIRD-PARTY-NOTICES.md before editing Vendor/.
         .target(
             name: "CLibRaw",
             path: "Vendor/LibRaw",
             exclude: [
-                // Stand-ins LibRaw compiles only when the real stage is left out of a build.
-                // Including both gives duplicate symbols. When updating LibRaw, compare
-                // against the object list in its Makefile.devel.
+                // Stand-ins for stages left out of a build. Including both gives duplicate symbols.
+                // When updating LibRaw, compare against the object list in its Makefile.devel.
                 "src/postprocessing/postprocessing_ph.cpp",
                 "src/preprocessing/preprocessing_ph.cpp",
                 "src/write/write_ph.cpp",
-                // Not a source file; named so SwiftPM does not warn that it has no rule for it.
+                // Listed so SwiftPM does not warn about a file with no rule.
                 "src/Makefile",
             ],
             sources: ["src"],
@@ -34,9 +31,8 @@ let package = Package(
                 .headerSearchPath("."),
                 .define("USE_ZLIB"),      // deflate-compressed DNG
                 .define("USE_X3FTOOLS"),  // Sigma Foveon (X3F)
-                // Not enabled, because each needs a further library: USE_JPEG (lossy DNG),
-                // USE_DNGSDK (JPEG XL DNG), USE_GPRSDK (GoPro). Apple's decoder covers the
-                // first two.
+                // Off, because each needs a further library: USE_JPEG (lossy DNG), USE_DNGSDK
+                // (JPEG XL DNG), USE_GPRSDK (GoPro). Apple's decoder covers the first two.
             ],
             linkerSettings: [.linkedLibrary("z")]
         ),

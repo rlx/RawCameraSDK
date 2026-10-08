@@ -1,49 +1,41 @@
 # Building and running
 
-Requirements: macOS with Xcode 27 (Swift 6). The library and demo run on iOS 17 and
-macOS 14 or later. Nothing else is needed for the Swift package; the Rust and WebAssembly
-bindings need their own toolchains, listed below.
+Requires macOS with Xcode 27. The library and demo run on iOS 17 and macOS 14 or later.
 
 ```sh
 git clone --recurse-submodules https://github.com/rlx/RawCameraSDK.git
 cd RawCameraSDK
 ```
 
-LibRaw is a git submodule. If you cloned without `--recurse-submodules`, run
-`git submodule update --init`.
+LibRaw is a submodule. After a plain clone, run `git submodule update --init`.
 
-## The library
+## Library
 
 ```sh
 swift build
 ```
 
-To use it in another project, add the package and depend on its `RawInputKit` product.
-The repository and the library have different names, so the product has to be named:
+As a dependency:
 
 ```swift
 .package(url: "https://github.com/rlx/RawCameraSDK.git", from: "0.1.0")
-// and in the target:
+// in the target:
 .product(name: "RawInputKit", package: "RawCameraSDK")
 ```
 
-## The demo app
+## Demo app
 
 Open `Examples/RawInputDemo/RawInputDemo.xcodeproj` and run the `RawInputDemo` scheme on an
-iPhone simulator or "My Mac". The first build downloads eleven sample files (285 MB) and
-verifies their checksums.
+iPhone simulator or "My Mac". The first build downloads eleven sample files (285 MB).
 
-The app opens on one file both decoders can open and ten that Apple's decoder rejects. Open
-one and switch the decoder between Automatic, Apple and Fallback, and the rendering between
-Decoder (each decoder's own output), Neutral and Film. The exposure slider works on the
-linear image. Import adds your own files from Files or a card reader.
+The gallery has one file that both decoders open and ten that Apple's decoder rejects. In
+the detail view, the first picker selects the decoder and the second the rendering:
+the decoder's own output, or the Neutral or Film look. Import adds your own files.
 
-To run on a phone, select the `RawInputDemo` target, choose your team under
-Signing & Capabilities, and run. The phone needs Developer Mode switched on
-(Settings → Privacy & Security).
+To run on a phone, choose your team under Signing & Capabilities for the `RawInputDemo`
+target. The phone needs Developer Mode on (Settings → Privacy & Security).
 
-The Xcode project is generated from `project.yml` with XcodeGen and committed, so the tool
-is only needed to change project settings.
+XcodeGen is only needed to change project settings (`project.yml`).
 
 ## Tests
 
@@ -53,8 +45,7 @@ Scripts/corpus.py fetch --only DMC-LX10_-_1_1         # one more, for the crop t
 swift test
 ```
 
-Without the downloads, the suites that need files are skipped, with the command that
-fetches them, and the rest still run. CI runs them on pushes to `main` and on pull requests.
+Suites whose files are missing are skipped.
 
 On the iPhone simulator:
 
@@ -64,16 +55,13 @@ xcodebuild test -scheme RawInputKit-Package -destination 'platform=iOS Simulator
 
 ## On a device
 
-`xcrun devicectl list devices` gives the device's UDID. The team ID is the ten-character
-code of the Apple developer team that signs the build; a free personal team works.
+`xcrun devicectl list devices` prints the UDID. A free personal team works for signing.
 
 ```sh
-# The test suite, on the device. It runs inside the demo app, because a device cannot
-# run a Swift package's tests directly.
+# Test suite, hosted in the demo app.
 Scripts/device-tests.sh <device-udid> <team-id>
 
-# Timings and peak memory. 15 app launches by default, one per measurement;
-# the second form measures everything three times.
+# Timings and peak memory: 15 app launches by default, or everything three times.
 Scripts/device-bench.py <device-udid>
 Scripts/device-bench.py <device-udid> --limit 0 --runs 3
 ```
@@ -88,12 +76,12 @@ xcrun devicectl device install app --device <device-udid> \
     .build/device/Build/Products/Release-iphoneos/RawInputDemo.app
 ```
 
-## The portable core, Rust and WebAssembly
+## Portable core, Rust, WebAssembly
 
-See [PORTING.md](PORTING.md) for what these are.
+Described in [PORTING.md](PORTING.md).
 
 ```sh
-# Plain C: builds the core with CMake and decodes a sample.
+# C: build the core with CMake and decode a sample.
 cmake -S . -B .build/cmake && cmake --build .build/cmake && ctest --test-dir .build/cmake
 
 # Rust (needs a Rust toolchain).
@@ -106,8 +94,8 @@ node Bindings/web/test.mjs
 
 ## Regenerating the measurements
 
-Every number in the README and in [MEASUREMENTS.md](MEASUREMENTS.md) comes from these
-commands. The full archive is 19 GB.
+The numbers in the README and [MEASUREMENTS.md](MEASUREMENTS.md) come from these commands.
+The full archive is 19 GB. Apple's results depend on the OS version.
 
 ```sh
 Scripts/corpus.py fetch
@@ -117,7 +105,7 @@ swift run -c release rawprobe match FILES... --json Tests/match-results.json
 Scripts/coverage.py && Scripts/charts.py
 ```
 
-`rawprobe` also looks at single files:
+Single files:
 
 ```sh
 swift run -c release rawprobe render  FILE out.jpg [apple|fallback]   # develop one file
@@ -126,13 +114,12 @@ swift run -c release rawprobe looks   FILE out.jpg                    # both thr
 swift run -c release rawprobe fuzz    FILE... --iterations 800        # decode damaged copies
 ```
 
-To fuzz under AddressSanitizer, build the tool with it first:
+Fuzzing under AddressSanitizer:
 
 ```sh
 swift build -c release --sanitize=address --scratch-path .build/asan
 .build/asan/release/rawprobe fuzz FILE... --iterations 400
 ```
 
-`Examples/RawInputDemo/Scripts/record-demo.sh` re-records the walkthrough GIF by running the
-app's UI test in the simulator. `Scripts/conformance.py` regenerates the kernel conformance
-cases.
+`Examples/RawInputDemo/Scripts/record-demo.sh` re-records the walkthrough GIF.
+`Scripts/conformance.py` regenerates the kernel conformance cases.

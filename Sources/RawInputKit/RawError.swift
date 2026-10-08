@@ -1,22 +1,19 @@
 import Foundation
 
 public enum RawError: Error, Equatable, Sendable {
-    /// The file does not exist or cannot be read. For a file from a document picker, check
-    /// that its security-scoped access is still active.
+    /// The file does not exist or cannot be read. Security-scoped access may have ended.
     case fileUnreadable(URL)
     /// Apple's RAW engine cannot develop this file on this OS.
     case appleCannotDecode
-    /// The fallback decoder rejected the file. `code` is the decoder's own status, kept for
-    /// logs and bug reports; `reason` is its description.
+    /// The fallback decoder rejected the file. `code` is the decoder's own status.
     case fallbackCannotDecode(code: Int32, reason: String)
-    /// The sensor data is truncated or corrupt. The fallback can produce an image from such
-    /// a file, but part of it is garbage, so it is reported as a failure.
+    /// The sensor data is truncated or corrupt.
     case corruptData
     /// Decoding the file would need more memory than `RawDecodeOptions.fallbackMemoryLimitMB`.
     case exceedsMemoryLimit
     /// `RawDecodeOptions.isCancelled` returned true while the file was being decoded.
     case cancelled
-    /// Rendering failed after a successful decode. `reason` carries the underlying error.
+    /// Rendering failed after a successful decode.
     case renderFailed(reason: String)
     /// The file has no embedded preview and cannot be developed to make one.
     case noPreview

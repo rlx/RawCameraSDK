@@ -5,14 +5,9 @@ import Foundation
 /// the supported API.
 @_spi(Measurement)
 public enum RawMeasurement {
-    /// Renders every pixel of an image, synchronously, the way an export would.
+    /// Renders every pixel of an image synchronously.
     ///
-    /// `CIContext.createCGImage` is not a measurement: by default it returns at once and
-    /// does the work when the image's pixels are first read. Rendering into a bitmap the
-    /// caller owns has no such deferral.
-    ///
-    /// - Returns: false if the image came out entirely transparent black, which is how a
-    ///   file a decoder cannot really develop shows up.
+    /// - Returns: false if the image came out entirely transparent black.
     public static func renderFully(_ image: CIImage, context: CIContext) -> Bool {
         let extent = image.extent.integral
         let width = Int(extent.width), height = Int(extent.height)
@@ -23,12 +18,11 @@ public enum RawMeasurement {
         context.render(
             image, toBitmap: pixels.baseAddress!, rowBytes: width * 4, bounds: extent, format: .RGBA8,
             colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
-        // A sparse scan is enough to tell a picture from nothing.
+        // Sparse scan.
         return stride(from: 0, to: pixels.count, by: 4099).contains { pixels[$0] != 0 }
     }
 
-    /// Physical memory the process is using now, and the most it has used, in megabytes:
-    /// the figures iOS judges an app by when it decides what to terminate.
+    /// Current and peak physical memory footprint of the process, in megabytes.
     public static var memoryFootprint: (currentMB: Double, peakMB: Double) {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)

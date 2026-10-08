@@ -5,23 +5,23 @@ public struct RawDecodeOptions: Sendable {
     public enum Routing: Sendable {
         /// Apple's decoder when it can develop the file, the fallback otherwise.
         case automatic
-        /// Apple's decoder only; throws `RawError.appleCannotDecode` if it cannot.
+        /// Apple's decoder only. Throws `RawError.appleCannotDecode` if it cannot develop the file.
         case apple
-        /// The fallback only, even for files Apple opens. For comparison and testing.
+        /// The fallback only, even for files Apple opens.
         case fallback
     }
 
     public enum AppleRendering: Sendable {
         /// Apple's default look, including its tone curve.
         case standard
-        /// Tone boost and gamut mapping switched off, for pipelines that apply their own look.
+        /// Tone boost and gamut mapping switched off.
         case linear
     }
 
     public enum AppleDecoderVersion: Sendable {
         /// Whatever the OS picks. On OS 27 that is RAW 8.
         case systemDefault
-        /// The newest version the OS offers for this file, which is how RAW 9 is opted into.
+        /// The newest version the OS offers for this file. Opts into RAW 9.
         case newest
     }
 
@@ -34,48 +34,31 @@ public struct RawDecodeOptions: Sendable {
     public var appleDecoderVersion: AppleDecoderVersion = .systemDefault
 
     /// Fallback route only: frames with more pixels than this are developed at half the
-    /// width and height, by merging each 2x2 cell of the mosaic into one pixel.
+    /// width and height. A developed frame takes 8 bytes per pixel.
     ///
-    /// This exists for memory. A developed frame is held as 16-bit float RGBA, 8 bytes per
-    /// pixel, so 100 MP needs about 800 MB before anything is done with it. The threshold is
-    /// set with phones of 4 GB or less in mind.
-    ///
-    /// It is a threshold, not a cap. The frame is halved once, and only mosaic sensors can
-    /// be halved; Foveon, monochrome and already-demosaiced files come out at full size
-    /// regardless. Check `RawImage.isHalfSize` for what actually happened. The Apple route
-    /// ignores it: `CIRAWFilter` renders lazily, in tiles, and manages its own memory.
+    /// The frame is halved once, and only mosaic sensors can be halved. Check
+    /// `RawImage.isHalfSize` for the outcome.
     public var halfSizeAbovePixels: Int = 64_000_000
 
     /// Fallback route only: the most memory, in megabytes, the decoder may allocate for one
-    /// file's sensor data and developed frame. A file whose header asks for more is refused
-    /// with `RawError.exceedsMemoryLimit`. Dimensions come from the file, so without a limit
-    /// a damaged or hostile header can ask for gigabytes.
+    /// file. A file whose header asks for more throws `RawError.exceedsMemoryLimit`.
     public var fallbackMemoryLimitMB = 1024
 
-    /// Fallback route only: polled between decoding stages; return true to abandon the
-    /// decode, which then throws `RawError.cancelled`. The slowest files take seconds, and
-    /// a user who has scrolled away should not have to wait for them. Called on the
-    /// decoding thread.
+    /// Fallback route only: polled between decoding stages on the decoding thread. Return
+    /// true to abandon the decode, which then throws `RawError.cancelled`.
     public var isCancelled: (@Sendable () -> Bool)?
 
-    /// Receives `RawEvent`s as the file is opened: routing decisions, GPU failures, suspect
-    /// colour. Called on the decoding thread.
+    /// Receives `RawEvent`s as the file is opened. Called on the decoding thread.
     public var eventHandler: (@Sendable (RawEvent) -> Void)?
 
     /// Fallback route only: compare the developed image with the camera's embedded preview
-    /// and report the result in `RawImage.previewDistance`.
-    ///
-    /// The fallback can decode a file without error and still get its colours wrong, most
-    /// often for a camera newer than LibRaw's tables. This is how a caller finds out. It
-    /// costs one small JPEG decode and two tiny renders, most for files whose embedded
-    /// preview is full-size. Turn it off for bulk work where nobody will act on the answer.
+    /// and report the result in `RawImage.previewDistance`. Costs one small JPEG decode and
+    /// two tiny renders.
     public var checksColorAgainstPreview = true
 
     public init() {}
 
-    /// Options for a caller that renders the picture itself: scene-linear data from Apple's
-    /// decoder as well as from the fallback, ready for `RawImage.rendered(look:)` or an
-    /// editor's own pipeline.
+    /// Options that give scene-linear data from both routes.
     public static var sceneLinear: RawDecodeOptions {
         var options = RawDecodeOptions()
         options.appleRendering = .linear

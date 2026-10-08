@@ -5,7 +5,7 @@ struct RawInputDemoApp: App {
     @State private var library = Library()
 
     init() {
-        // Headless measurement mode; exits the process if requested. See Benchmark.swift.
+        // Exits the process if a benchmark was requested. See Benchmark.swift.
         Benchmark.runIfRequested()
     }
 

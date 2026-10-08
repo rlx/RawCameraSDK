@@ -16,7 +16,6 @@ struct LookTests {
         }
     }
 
-    /// A tone curve that reverses anywhere would turn a gradient into bands.
     @Test(arguments: [RawLook.neutral, .film])
     func toneCurveNeverReverses(_ look: RawLook) {
         let lumas = Self.greys.map { look.apply($0) }.map { 0.2126 * $0.x + 0.7152 * $0.y + 0.0722 * $0.z }
@@ -48,8 +47,7 @@ struct LookTests {
         let n = RawLook.cubeSize
         let data = RawLook(contrast: 0).cubeData()
         #expect(data.count == n * n * n * 4 * MemoryLayout<Float>.stride)
-        // With no adjustments the table is the identity, which also pins the axis order:
-        // red varies fastest, blue slowest.
+        // With no adjustments the table is the identity. Red varies fastest, blue slowest.
         data.withUnsafeBytes { bytes in
             let values = bytes.bindMemory(to: Float.self)
             func entry(r: Int, g: Int, b: Int) -> SIMD3<Float> {
@@ -62,7 +60,6 @@ struct LookTests {
         }
     }
 
-    /// The table, applied by Core Image, has to give what `apply` computes.
     @Test func renderedImageMatchesTheMaths() {
         let grey = CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)!)
             .cropped(to: CGRect(x: 0, y: 0, width: 8, height: 8))

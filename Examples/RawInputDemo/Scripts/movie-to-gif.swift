@@ -1,10 +1,6 @@
 // Converts a screen recording into a compact animated GIF, using only system frameworks.
 //
 //     swift movie-to-gif.swift <movie> <out.gif> [frames per second] [width in pixels]
-//
-// GitHub shows a GIF inline in a README; it does not do that for a video file in the
-// repository. Five frames a second at 300 pixels wide keeps a one-minute walkthrough to a
-// few megabytes while leaving every state readable.
 import AVFoundation
 import CoreGraphics
 import Foundation

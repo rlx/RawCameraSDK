@@ -4,14 +4,10 @@ import Foundation
 
 /// Runs RawInputKit's blocking calls off the main thread for the views.
 ///
-/// RawInputKit is synchronous: a decode occupies its thread for anything from a tenth of a
-/// second to several seconds. That work goes to a dispatch queue of its own instead of
-/// Swift's cooperative thread pool, which is sized to the CPU count and is not meant to be
-/// blocked.
-///
-/// Cancellation reaches the work in three ways: work that has not started is skipped, a
-/// fallback decode in flight is abandoned between stages (the slow ones take seconds), and
-/// callers discard results they no longer want. See `DetailModel` for the last.
+/// A decode can block for several seconds, so the work runs on its own dispatch queue,
+/// off Swift's cooperative thread pool. Cancellation skips work that has not started and
+/// abandons a fallback decode between stages. Callers discard results they no longer
+/// want, see `DetailModel`.
 enum Develop {
     private static let queue = DispatchQueue(label: "RawInputDemo.develop", qos: .userInitiated, attributes: .concurrent)
     private static let context = CIContext()
@@ -28,13 +24,12 @@ enum Develop {
         try? await offload { try RawInput.preview(url, maxPixelSize: 600) }
     }
 
-    /// - Parameter sceneLinear: ask Apple's decoder for scene-linear output too, which is
-    ///   what a shared look needs. The fallback's output always is.
+    /// - Parameter sceneLinear: ask Apple's decoder for scene-linear output, which a shared
+    ///   look needs. The fallback's output always is.
     static func open(
         _ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool
     ) async throws -> (image: RawImage, seconds: Double) {
-        // The decode runs on a dispatch queue, outside the task, so it cannot see the
-        // task's cancellation directly; a flag carries it across.
+        // The dispatch queue cannot see the task's cancellation, so a flag carries it across.
         let cancelled = Flag()
         return try await withTaskCancellationHandler {
             try await offload {
@@ -52,14 +47,10 @@ enum Develop {
         }
     }
 
-    /// Renders for the screen, at most `longEdge` pixels on its longer side.
+    /// Renders for the screen, at most `longEdge` pixels on its longer side. Nothing is
+    /// cached. Returns `nil` if Core Image produces nothing.
     ///
-    /// Exposure and the look are applied to the linear image and nothing is cached, so each
-    /// call is the operation an editor would run on the decoder's output. Returns `nil` if
-    /// Core Image produces nothing, which is how a file Apple's decoder cannot really
-    /// develop shows up.
-    ///
-    /// - Parameter look: `nil` shows the decoder's own output, with no shared rendering.
+    /// - Parameter look: `nil` shows the decoder's own output.
     static func render(
         _ raw: RawImage, look: RawLook?, exposureEV: Double, longEdge: CGFloat = 2400
     ) async -> CGImage? {
@@ -68,14 +59,13 @@ enum Develop {
                 ?? raw.displayImage(exposureEV: exposureEV)
             let scale = min(1, longEdge / max(image.extent.width, image.extent.height))
             let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-            // Not deferred: by default Core Image would postpone the render until the image
-            // is first drawn, which would move it onto the main thread and hide a failure.
+            // Not deferred. Core Image would otherwise render at first draw, on the main thread,
+            // and hide a failure.
             return context.createCGImage(scaled, from: scaled.extent, format: .RGBA8, colorSpace: nil, deferred: false)
         }
     }
 
-    /// Copies a file the user picked into `folder`, holding its security-scoped access for
-    /// the duration of the copy.
+    /// Copies a picked file into `folder` while holding its security-scoped access.
     static func importCopy(of url: URL, into folder: URL) async throws -> URL {
         try await offload {
             let scoped = url.startAccessingSecurityScopedResource()

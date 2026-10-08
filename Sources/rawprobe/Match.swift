@@ -2,28 +2,20 @@ import CoreImage
 import Foundation
 import RawInputKit
 
-/// `rawprobe match`: measures how alike the two decoders' pictures are, before and after
-/// the shared rendering step, on files both can open.
+/// `rawprobe match`: how alike the two decoders' pictures are on files both can open.
 ///
-/// Three stages are compared, because the first is not a fair baseline on its own:
-///
-///   - each decoder's default output: Apple's finished rendering against the fallback's
-///     flat one. Large, and mostly because one has a tone curve and the other does not.
-///   - both scene-linear, each at its measured exposure, no look. This is how alike the
-///     decoders' *data* is, which is the real starting point.
+///   - each decoder's default output. Large, mostly because only Apple's has a tone curve.
+///   - both scene-linear at measured exposure, no look. How alike the decoders' data is.
 ///   - both through the same `RawLook`.
 enum Match {
     /// Field names are read by `Scripts/charts.py`.
     struct Row: Codable {
         var file: String
         var camera: String
-        /// ΔE between Apple's own output and the fallback's own output.
+        /// ΔE between the routes at each stage.
         var ownOutput: Double
-        /// ΔE between the routes' scene-linear data at measured exposure, before any look.
         var linear: Double
-        /// ΔE between the routes after the shared neutral rendering.
         var sharedNeutral: Double
-        /// ΔE between the routes after the shared film rendering.
         var sharedFilm: Double
     }
 
@@ -53,7 +45,7 @@ enum Match {
         DispatchQueue.concurrentPerform(iterations: files.count) { index in
             slots.wait()
             defer { slots.signal() }
-            // Files one decoder cannot open are simply not part of this comparison.
+            // Skips files one decoder cannot open.
             guard let row = try? autoreleasepool(invoking: { try measure(files[index]) }) else { return }
             lock.withLock {
                 rows.append(row)

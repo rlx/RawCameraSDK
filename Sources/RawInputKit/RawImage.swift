@@ -11,9 +11,9 @@ public enum RawRoute: String, Sendable, Codable {
 
 /// Which of the fallback's two development paths produced an image.
 public enum RawFallbackPath: String, Sendable, Codable {
-    /// Developed by the Metal kernel: plain Bayer sensors.
+    /// The Metal kernel, for plain Bayer sensors.
     case gpu
-    /// Developed by the fallback decoder's own CPU pipeline: everything else.
+    /// LibRaw's CPU pipeline, for everything else.
     case cpu
 }
 
@@ -21,67 +21,50 @@ public enum RawFallbackPath: String, Sendable, Codable {
 public struct RawImage: Sendable {
     /// The picture: linear light, in Core Image's working space, rotated upright.
     ///
-    /// What the two routes have in common is the encoding, not the look:
+    /// Fallback route: scene-linear with sRGB primaries and no tone curve. Highlights are
+    /// clipped at 1 and colours outside sRGB can be negative. The GPU path backs it with a
+    /// Metal texture on the system default device, the CPU path with a bitmap. Both take
+    /// 8 bytes per pixel.
     ///
-    /// - On the **fallback** route the values are scene-linear: white-balanced and converted
-    ///   to sRGB primaries, with no tone curve. Highlights are clipped at 1; colours outside
-    ///   sRGB can be negative. Shown as is, it looks dark and flat; see `displayImage`.
-    /// - On the **Apple** route it carries Apple's tone mapping, lens corrections and noise
-    ///   reduction (unless `appleRendering` is `.linear`), and highlights can exceed 1.
-    ///
-    /// The routes also differ in what backs the image, which matters once it leaves the
-    /// function that opened it:
-    ///
-    /// - **Apple**: lazy. Pixels are decoded from the file when the image is rendered, so
-    ///   the file must stay readable (keep security-scoped access open) until then.
-    /// - **Fallback, GPU path**: a Metal texture on the system default device, 8 bytes per
-    ///   pixel of GPU memory, held for as long as the image is. Render it with a
-    ///   Metal-backed `CIContext`.
-    /// - **Fallback, CPU path**: a bitmap in memory, also 8 bytes per pixel.
+    /// Apple route: carries Apple's tone mapping, lens corrections and noise reduction
+    /// unless `appleRendering` is `.linear`. Highlights can exceed 1. Pixels are decoded at
+    /// render time, so the file must stay readable until then.
     public let image: CIImage
 
     public let route: RawRoute
 
-    /// On the fallback route, which path developed the image; `nil` on the Apple route.
+    /// The fallback path that developed the image. `nil` on the Apple route.
     public let fallbackPath: RawFallbackPath?
 
-    /// True when `image` is scene-linear: proportional to the light the sensor recorded,
-    /// with no tone curve applied. Always true on the fallback route; true on the Apple
-    /// route only when it was opened with `appleRendering = .linear`. `rendered(look:)`
-    /// gives matching pictures from both routes only for scene-linear images.
+    /// True when `image` is scene-linear, with no tone curve applied. Always true on the
+    /// fallback route. On the Apple route, true only with `appleRendering = .linear`.
     public let isSceneLinear: Bool
 
-    /// The decoder in words, for display and logs: "Apple RAW 8", "LibRaw 0.22.2 + Metal",
-    /// "LibRaw 0.22.2 CPU".
+    /// For display and logs: "Apple RAW 8", "LibRaw 0.22.2 + Metal", "LibRaw 0.22.2 CPU".
     public let decoder: String
 
     public let info: RawInfo
 
-    /// Exposure, in stops, that brings a scene-linear image to a viewable brightness: the
-    /// boost that puts the brightest 1% of the frame just under white. It is measured the
-    /// same way on both routes, which is what lets one rendering step serve both. Zero when
-    /// the image is not scene-linear, since Apple has then already rendered it for display.
+    /// Exposure, in stops, that puts the brightest 1% of a scene-linear frame just under
+    /// white. Zero when the image is not scene-linear.
     public let suggestedExposureEV: Double
 
-    /// How far the image's colours sit from the camera's embedded preview, ignoring
-    /// brightness: 0 is identical, below 0.05 is typical of a correct decode. `nil` when it
-    /// was not measured: on the Apple route, when the file has no preview, or when
+    /// Distance between the image's colours and the camera's embedded preview, ignoring
+    /// brightness. 0 is identical and below 0.05 is typical of a correct decode. `nil` on
+    /// the Apple route, when the file has no preview, or when
     /// `RawDecodeOptions.checksColorAgainstPreview` is off.
     public let previewDistance: Double?
 
-    /// The distance above which a decode deserves a second look.
+    /// The distance above which `isColorSuspect` is true.
     public static let suspectPreviewDistance = 0.15
 
-    /// True when the fallback's colours disagree with the camera's own rendering by enough
-    /// that the decode is probably wrong: usually a camera LibRaw does not properly know.
-    /// The image is still returned, because a tinted picture can be better than none and
-    /// only the caller knows which; a viewer should mark it, an importer might refuse it.
+    /// True when the fallback's colours are far enough from the camera's preview that the
+    /// decode is probably wrong. The image is still returned.
     public var isColorSuspect: Bool {
         previewDistance.map { $0 > Self.suspectPreviewDistance } ?? false
     }
 
-    /// True when the fallback developed the frame at half its width and height; see
-    /// `RawDecodeOptions.halfSizeAbovePixels`.
+    /// True when the fallback developed the frame at half its width and height.
     public let isHalfSize: Bool
 
     public init(
@@ -100,11 +83,8 @@ public struct RawImage: Sendable {
         self.isHalfSize = isHalfSize
     }
 
-    /// `image` made ready to show: `suggestedExposureEV` plus `exposureEV` applied in linear
-    /// light, then clipped to the displayable range.
-    ///
-    /// No tone curve is applied, so a scene-linear image comes out flat. It shows what the
-    /// decoder produced; `rendered(look:)` shows a picture.
+    /// `image` with `suggestedExposureEV` plus `exposureEV` applied in linear light, then
+    /// clipped to the displayable range. No tone curve is applied.
     public func displayImage(exposureEV: Double = 0) -> CIImage {
         var result = image
         let stops = suggestedExposureEV + exposureEV

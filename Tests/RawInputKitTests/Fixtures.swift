@@ -1,21 +1,17 @@
 import Foundation
 import Testing
 
-/// The RAW files the tests run against.
-///
-/// None of them are in the repository: they are large, and the archive they come from
-/// (raw.pixls.us, CC0) is the source of truth. Fetch them once:
+/// The RAW files the tests run against. They are not in the repository.
+/// Fetch them once from raw.pixls.us (CC0):
 ///
 ///     Examples/RawInputDemo/Scripts/fetch-samples.sh    the demo's eleven files, 285 MB
 ///     Scripts/corpus.py fetch --only DMC-LX10_-_1_1     one more, for the crop test, 22 MB
 ///
-/// Suites that need a file that is missing are skipped, with a message saying which
-/// command fetches it.
+/// Suites that need a missing file are skipped.
 ///
-/// On a physical device there is no repository to read from. The tests then run inside
-/// the demo app (see `Scripts/device-tests.sh`) and look in two more places: the app
-/// bundle, which already carries the demo's files, and the app's Documents folder, where
-/// the script puts the crop-test file as `cropped.rw2`.
+/// On a device the tests run inside the demo app (see `Scripts/device-tests.sh`). They
+/// also look in the app bundle and in the app's Documents folder, where the script puts
+/// the crop-test file as `cropped.rw2`.
 enum Fixtures {
     static let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -24,7 +20,7 @@ enum Fixtures {
         let file: String
         let camera: String
         let sha256: String
-        /// "shared" for the file both decoders open; absent for the ten only the fallback does.
+        /// "shared" for the file both decoders open. Absent for the other ten.
         let group: String?
 
         var url: URL {
@@ -35,11 +31,11 @@ enum Fixtures {
         var testDescription: String { camera }
     }
 
-    /// The ten bundled files Apple's decoder rejects. They exercise the fallback across its
-    /// formats: Bayer, X-Trans, Foveon, monochrome, Phase One, and a DNG.
+    /// The ten bundled files Apple's decoder rejects: Bayer, X-Trans, Foveon, monochrome,
+    /// Phase One, and a DNG.
     static let samples = bundled.filter { $0.group != "shared" }
 
-    /// The bundled file both decoders open, an ordinary Bayer file: Sony a9 III.
+    /// The bundled file both decoders open: Sony a9 III, Bayer.
     static let reference = bundled.first { $0.group == "shared" }?.url
 
     private static let bundled: [Sample] = {
@@ -53,8 +49,8 @@ enum Fixtures {
         return samples.filter { FileManager.default.fileExists(atPath: $0.url.path) }
     }()
 
-    /// A file shot with an in-camera 1:1 crop: Panasonic LX10. The sensor data is 3:2 and
-    /// only metadata says the picture is square.
+    /// Panasonic LX10 with an in-camera 1:1 crop. The sensor data is 3:2 and only metadata
+    /// says the picture is square.
     static let cropped = corpusFile(named: "DMC-LX10_-_1_1") ?? document("cropped.rw2")
 
     static let fetchHint: Comment = "run fetch-samples.sh, and Scripts/corpus.py fetch --only DMC-LX10_-_1_1"

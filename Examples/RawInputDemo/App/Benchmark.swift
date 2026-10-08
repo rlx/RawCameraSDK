@@ -2,18 +2,14 @@ import CoreImage
 import Foundation
 @_spi(Measurement) import RawInputKit
 
-/// Headless measurement mode, for timing the decoders on a real device.
+/// Headless measurement mode, for timing the decoders on a device.
 ///
 ///     RawInputDemo -benchmarkFile samsung-nx1.srw -benchmarkRoute fallback
 ///
-/// The app decodes that one file, renders every pixel, prints one line of JSON prefixed
-/// with `RAWBENCH` and exits. `Scripts/device-bench.py` launches it once per file and
-/// route through `devicectl` and collects the lines.
-///
-/// One measurement per launch is deliberate. Peak memory is a lifetime high-water mark
-/// that cannot be reset, and iOS terminates an app that uses too much; a fresh process per
-/// run gives each decode its own number and turns a termination into a missing line for
-/// that file instead of a lost session.
+/// Decodes the file, renders every pixel, prints one line of JSON prefixed with
+/// `RAWBENCH` and exits. `Scripts/device-bench.py` launches it once per file and route.
+/// One measurement per launch, because peak memory cannot be reset and iOS terminates
+/// an app that uses too much.
 enum Benchmark {
     struct Result: Codable {
         var file: String
@@ -24,15 +20,13 @@ enum Benchmark {
         var width = 0
         var height = 0
         var isHalfSize = false
-        /// Embedded preview, 600 px: what a gallery pays per tile.
+        /// Embedded preview, 600 px.
         var previewSeconds = 0.0
         /// `RawInput.open` alone.
         var openSeconds = 0.0
-        /// Open plus rendering the whole frame to 8-bit sRGB: what an export pays.
+        /// Open plus rendering the whole frame to 8-bit sRGB.
         var totalSeconds = 0.0
-        /// The same again, a second time in the same process. The first decode in a process
-        /// also pays for one-off setup, such as shader compilation and whatever Apple's
-        /// engine prepares per camera; this is what every later file costs.
+        /// The same again in the same process, without one-off setup such as shader compilation.
         var secondTotalSeconds = 0.0
         var peakMegabytes = 0.0
         var error = ""
@@ -81,16 +75,14 @@ enum Benchmark {
         var options = RawDecodeOptions()
         options.routing = route == "fallback" ? .fallback : .automatic
         options.appleRendering = route == "apple-linear" ? .linear : .standard
-        // "apple" and "apple-linear" measure Apple's decoder alone, without this library's
-        // support check in front of it; "automatic" is what an app calling `RawInput.open`
-        // would pay.
+        // "apple" and "apple-linear" skip this library's support check. "automatic" is
+        // `RawInput.open` as an app calls it.
         func open() throws -> RawImage {
             try route.hasPrefix("apple")
                 ? RawInput.openAppleUnchecked(url, options: options)
                 : RawInput.open(url, options: options)
         }
-        // Everything else is left at its default, half-size threshold included: this
-        // measures what the library does on the device, not what it could be pushed to.
+        // Everything else stays at its default, half-size threshold included.
         start = clock.now
         do {
             let raw = try open()
@@ -102,8 +94,7 @@ enum Benchmark {
             let rendered = RawMeasurement.renderFully(raw.image, context: CIContext())
             result.totalSeconds = seconds(since: start)
             if !rendered { result.error = "nothing was rendered" }
-            // Read now, before the second pass: the high-water mark cannot be reset, and
-            // two decodes in one process would report the pair's peak, not one decode's.
+            // Read before the second pass. The high-water mark cannot be reset.
             result.peakMegabytes = RawMeasurement.memoryFootprint.peakMB
 
             start = clock.now

@@ -2,12 +2,10 @@ import CoreImage
 import Foundation
 import RawInputKit
 
-/// `rawprobe compare`: both decoders' own output for one file, side by side, so the
-/// difference in look and detail can be judged by eye.
+/// `rawprobe compare`: both decoders' output for one file, side by side.
 ///
-/// Apple on the left, the fallback on the right; the whole frame on top and a 1:1 crop from
-/// the centre underneath. Nothing is done to either image beyond what its decoder did,
-/// apart from the fallback's default exposure.
+/// Apple on the left, the fallback on the right. Whole frame on top, a 1:1 centre crop
+/// below. The only adjustment is the fallback's default exposure.
 enum Compare {
     static func run(input: URL, output: URL) throws {
         let apple = try open(input, .apple), fallback = try open(input, .fallback)
@@ -26,7 +24,7 @@ enum Compare {
         var options = RawDecodeOptions()
         options.routing = routing
         options.appleRendering = linear ? .linear : .standard
-        // Compare like with like: never let the pixel threshold halve the fallback.
+        // Stops the pixel threshold halving the fallback.
         options.halfSizeAbovePixels = .max
         return try RawInput.open(url, options: options)
     }

@@ -1,124 +1,106 @@
 # RAW in Studio Pro: a recommendation
 
-This is what I would propose if I were on the team, written from outside it. Figures marked
-*measured* come from this repository and can be rerun. I have no knowledge of VSCO's
-internals; the assumptions I am making are listed at the end.
+Written from outside VSCO. Figures marked *measured* come from this repository and can be
+rerun. My assumptions are listed at the end.
 
-## Where things stand
-
-Two public facts frame the question.
+## Background
 
 - Studio Pro imports JPEG and HEIC. Its guide (22 September 2026) says RAW "is confirmed on
-  the product roadmap" and asks RAW shooters to export JPEGs first; tethering in 1.3.0 is
-  JPEG-only. ([Guide](https://www.vsco.co/learn/getting-started-vsco-studio-pro),
+  the product roadmap", and tethering in 1.3.0 is JPEG-only.
+  ([Guide](https://www.vsco.co/learn/getting-started-vsco-studio-pro),
   [App Store](https://apps.apple.com/us/app/vsco-studio-pro-photo-editor/id6759939220))
 - VSCO's main app already edits RAW on supported iOS devices.
   ([Photo editor FAQ](https://www.vsco.co/features/photo-editor))
 
-So decoding RAW is not new to VSCO. The open question is how RAW reaches the new editor,
-and my guess is that the hard part is the new engine and not the decoder: the data has to
-arrive in the engine's working space, look the same on iOS and macOS, and keep looking the
-same when a photographer reopens an edit after an OS update.
+VSCO already decodes RAW, so I assume the open work is getting RAW into the new engine: in
+its working colour space, matching across iOS and macOS, and stable when an edit is
+reopened after an OS update.
 
-## What I measured
+## Measurements
 
-| Question | Answer |
+| Question | Result |
 |---|---|
-| How much does Apple's decoder cover? | 821 of 944 test files (87%), and more of the recent ones: see the README |
-| What does a LibRaw fallback add? | 107 more files, 98% in total |
-| Do the two decoders' pictures match? | Not out of the box. Through one shared rendering step, to a median ΔE of about 3 |
-| What does the fallback cost in speed? | Comparable to Apple on Bayer sensors, several times slower on X-Trans |
-| Is the fallback always right? | No. It flags 15 of 822 of its own results as probably wrong |
+| Coverage of Apple's decoder | 821 of 944 test files (87%); 93% of those shot since 2019 |
+| Added by a LibRaw fallback | 107 files, for 98% in total |
+| Agreement between the two | Median ΔE about 3 from scene-linear data with a common exposure measurement |
+| Fallback speed | Comparable to Apple on Bayer sensors, several times slower on X-Trans |
+| Fallback correctness | 15 of 822 results flagged as probably wrong colour |
 
-## What I would do
+Details are in [MEASUREMENTS.md](MEASUREMENTS.md).
 
-**1. Use Apple's decoder in Studio Pro.** It opens nearly every recent mainstream camera in
-the test set, including formats older forum posts say it cannot (all 4 Nikon High
-Efficiency files, 36 of 37 Fujifilm compressed). It costs nothing to license and Apple
-maintains it. I expect this covers most Studio Pro users, but that is VSCO's data to check,
-not mine.
+## Proposal
 
-**2. Take scene-linear data from it, not Apple's rendering.** `CIRAWFilter` with its tone
-curve and gamut mapping off returns data proportional to the scene. The look then belongs to
-VSCO's engine, and a RAW file and a JPEG from the same shoot go through the same presets.
-Two costs to know about, both *measured* on an iPhone 16 Pro Max:
+**1. Use Apple's decoder in Studio Pro.** It opens nearly every recent mainstream camera
+in the test set, including all 4 Nikon High Efficiency files and 36 of 37 compressed
+Fujifilm files. Apple maintains it and there is nothing to license.
 
-- Apple's decoder has a first-use cost per camera model, and for one it is large: 6 to 7 s
-  for the first Panasonic S1R II file in a process, about 1 s for the next. Warm it up off
-  the main thread.
-- This library measures each picture's exposure with a second, reduced decode when asked
-  for linear output, which added 0.1 to 1.2 s depending on the file. A product would replace
-  that with a
-  per-camera baseline and pay nothing.
+**2. Request scene-linear output.** With the tone curve and gamut mapping off,
+`CIRAWFilter` returns data proportional to the scene. VSCO's engine then applies the look,
+and RAW and JPEG files from one shoot go through the same presets. Two costs, *measured* on
+an iPhone 16 Pro Max:
 
-**3. Hand the engine a texture, not a `CIImage`.** A GPU engine wants the pixels in a
-texture it owns, in a stated colour space. `RawImage.makeTexture(device:)` in this
-repository does that hand-off (16-bit float, extended linear sRGB, top row first) and is
-tested on both decoders. As I understand wgpu, a Metal texture can be wrapped for it
-through its HAL, so this is the seam where a Rust engine would connect; I have not built
-that part.
+- The first file from a camera model can be slow: 6 to 7 s for a Panasonic S1R II, about
+  1 s for the next. Warm the decoder up off the main thread.
+- This library measures exposure with a second, reduced decode, which adds 0.1 to 1.2 s.
+  A per-camera baseline would remove that.
 
-**4. Pin the decoder version with each edit.** Apple revises its RAW engine with OS
-releases (`CIRAWFilter.decoderVersion`, `supportedDecoderVersions`). An edit saved against
-version 8 should reopen against version 8 for as long as the OS offers it, or the same
-sliders give a different picture after an update. The fallback needs the same treatment:
-`RawInput.fallbackVersion` is there to be stored.
+**3. Pass the engine a texture.** `RawImage.makeTexture(device:)` produces a 16-bit float
+Metal texture in extended linear sRGB, top row first, from either decoder. wgpu can wrap a
+Metal texture through its HAL, which is where a Rust engine would connect. I have not built
+that connection.
 
-**5. Count before building a fallback.** The files Apple cannot open are mostly old or
-niche: Sigma Foveon, Samsung NX, Phase One in two compression modes, a monochrome Pentax,
-hacked-firmware dumps. There are exceptions, such as a reduced-size mode of the 2025 Sony
-RX1R III. Whether any of this matters to Studio Pro's users is an empirical question.
-The library reports every file Apple turns away, with camera and compression scheme
-(`RawEvent.appleRejected`). Collecting that, with consent, says whether the number is 0.2%
-of imports or 5%.
+**4. Store the decoder version with each edit.** Apple revises its RAW engine across OS
+releases (`CIRAWFilter.decoderVersion`, `supportedDecoderVersions`). Reopening an edit
+with the version it was made on keeps the picture the same. `RawInput.fallbackVersion`
+serves the same purpose for the fallback.
 
-**6. If the count justifies it, the fallback is a bounded project.** This repository is its
-first stage. What remains, in the order I would do it:
+**5. Measure demand before building a fallback.** The files Apple rejects are mostly old
+or niche: Sigma Foveon, Samsung NX, two Phase One compression modes, a monochrome Pentax.
+A few are recent, such as a reduced-size mode of the 2025 Sony RX1R III. The library
+reports each rejected file with its camera and compression scheme
+(`RawEvent.appleRejected`). Collected with consent, that shows how many imports are
+affected.
 
-1. Harden the decode boundary: sanitizer-backed fuzzing in CI, detection of truncated
+**6. If demand is there, extend the fallback.** Remaining work, in order:
+
+1. Harden the decode boundary: sanitizer fuzzing in CI, detection of truncated
    uncompressed files, a format allowlist.
-2. Rendering parity with Apple's route: lens corrections from embedded metadata, noise
-   reduction, highlight handling, and a calibrated baseline exposure in place of
-   auto-exposure. This is the largest piece.
-3. Wide-gamut output, and a path into the engine that does not pass through Core Image.
-4. Per-camera verification in CI and a process for taking LibRaw updates.
+2. Rendering parity with Apple: lens corrections from metadata, noise reduction, highlight
+   handling, calibrated baseline exposure. This is the largest item.
+3. Wide-gamut output and a path to the engine that bypasses Core Image.
+4. Per-camera verification in CI and a process for LibRaw updates.
 
-There is also a continuing cost: each LibRaw release has to be re-verified per camera,
-because LibRaw can decode a new camera wrongly instead of refusing it. The licence position (LibRaw under CDDL, statically linked) needs counsel's
-sign-off. Note that CDDL does not forbid patching LibRaw; it requires publishing the
-patched files, so a security fix ahead of upstream is possible.
+Each LibRaw release needs re-verifying per camera, because LibRaw can decode a new camera
+with wrong colours. Static linking under CDDL needs legal review. CDDL allows patching
+LibRaw as long as the patched files are published.
 
-## Alternatives I considered
+## Alternatives
 
-| Option | Why not, or when |
+| Option | Assessment |
 |---|---|
-| Write decoders in-house | About 1,300 camera models, each with its own accumulated quirks. Not a good use of a small team. |
-| RawSpeed | LGPL only, which is awkward to satisfy in a statically linked App Store app, and it decodes without developing. |
-| A Rust decoder (rawler, rawloader) | The natural fit for a Rust engine, and worth a serious look. When I checked they were LGPL and covered fewer cameras than LibRaw; I have not evaluated them beyond that. |
-| Adobe's DNG SDK | Opens DNG only. Useful if VSCO were willing to ask users to convert, which defeats the purpose. |
-| License a codec for Nikon High Efficiency | Only needed if the fallback must cover it. Apple's decoder already does. |
+| In-house decoders | About 1,300 camera models to support and maintain. |
+| RawSpeed | LGPL, hard to satisfy in a statically linked App Store app. Decodes but does not develop. |
+| Rust decoders (rawler, rawloader) | A natural fit for a Rust engine. When I checked they were LGPL and supported fewer cameras than LibRaw. Not evaluated further. |
+| Adobe DNG SDK | DNG only, so users would have to convert first. |
+| Licensed Nikon High Efficiency codec | Not needed while Apple's decoder handles those files. |
 
-## What I would not do
+## Not recommended
 
-- Wait for a complete in-house RAW pipeline before shipping RAW in Studio Pro.
-- Promise "all RAW formats". Some need licensed codecs. Publish the list of supported
-  cameras instead; the probe in this repository generates it.
-- Ship the fallback without its colour check. A tinted picture presented as correct is worse
-  than "this camera is not supported yet".
+- Holding RAW in Studio Pro until an in-house pipeline is complete.
+- Promising "all RAW formats". Some need licensed codecs. Publish the supported-camera
+  list, which the probe in this repository generates.
+- Shipping the fallback without its colour check.
 
 ## Android
 
-As far as I know Android has no system RAW decoder beyond DNG, so there the fallback would
-not be a gap-filler, it would be the feature. The decoding half of this project would carry
-over, since it is LibRaw behind a C boundary. The GPU development kernel is Metal and would
-need writing again, or porting to the engine's shader language.
+Android has no system RAW decoder beyond DNG, as far as I know, so the fallback would be
+the whole feature there. The LibRaw core and its C interface carry over. The Metal kernel
+does not, but the WGSL version may.
 
-## Assumptions to correct
+## Assumptions
 
-- That Studio Pro's engine can accept a linear image or texture from `CIRAWFilter` on iOS
-  and macOS. If it must own decoding for consistency across platforms, step 6 moves up.
-- That the main app's RAW support is built on Apple's decoder. VSCO's FAQ ties it to
-  specific iOS devices, which suggests so, but I do not know.
-- That the look matters more to VSCO's users than the last tenth of cameras.
-- That there is capacity to build out the fallback if the data asks for it.
-- The timings come from one phone and one Mac. Phones with 4 GB or less are untested.
+- Studio Pro's engine can take a linear image or texture from `CIRAWFilter` on iOS and
+  macOS. If it has to own decoding for cross-platform consistency, step 6 comes first.
+- The main app's RAW support uses Apple's decoder. The FAQ ties it to specific iOS
+  devices, which suggests so.
+- Timings come from one phone and one Mac. Phones with 4 GB or less are untested.

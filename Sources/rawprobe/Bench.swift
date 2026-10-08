@@ -2,23 +2,15 @@ import CoreImage
 import Foundation
 @_spi(Measurement) import RawInputKit
 
-/// `rawprobe bench`: time and memory from file to a full-resolution rendered image, for
-/// each decoder.
+/// `rawprobe bench`: time and memory from file to a fully rendered image, per decoder.
 ///
-/// Both decoders hand back a lazy `CIImage`, and Apple's does almost no work until pixels
-/// are requested, so "decode time" is only comparable once each image has been rendered.
-/// Every measurement runs in its own child process, which keeps one decoder's caches and
-/// peak memory out of the other's numbers.
+/// Both decoders return a lazy `CIImage`, so times are compared after rendering.
+/// Each measurement runs in its own child process.
 ///
-/// Four things are measured per file, because they are easy to confuse:
-///
-///   - `apple`: Apple's decoder on its own, default rendering, with no support check in
-///     front of it. The decoder-against-decoder number.
-///   - `apple-linear`: Apple's decoder asked for scene-linear output, which is what a
-///     caller doing its own rendering uses. It costs more, because the library measures
-///     the picture's exposure with a second, reduced decode.
-///   - `automatic`: the file through `RawInput.open` as an app would call it, in a fresh
-///     process, so including the support check the first file of each kind pays.
+///   - `apple`: Apple's decoder alone, default rendering, no support check.
+///   - `apple-linear`: Apple's decoder with scene-linear output. Includes the second,
+///     reduced decode that measures exposure.
+///   - `automatic`: `RawInput.open` in a fresh process, support check included.
 ///   - `fallback`: the fallback, forced.
 enum Bench {
     struct Sample: Codable {
@@ -34,26 +26,23 @@ enum Bench {
         var file: String
         var camera: String
         var megapixels: Double
-        /// "Metal" or "CPU": which fallback path the file takes.
+        /// Fallback path: "Metal" or "CPU".
         var path: String
-        /// Apple's decoder alone.
         var appleSeconds: Double
         var applePeakMegabytes: Double
-        /// Apple's decoder asked for scene-linear output, exposure measurement included.
         var appleLinearSeconds: Double
-        /// Through `RawInput.open` with automatic routing, support check included.
         var automaticSeconds: Double
         var fallbackSeconds: Double
         var fallbackPeakMegabytes: Double
     }
 
-    /// Child-process entry point: decode, render every pixel, report.
+    /// Child-process entry point.
     /// - Parameter route: "apple", "apple-linear", "automatic" or "fallback".
     static func measure(_ url: URL, route: String) throws -> Sample {
         var options = RawDecodeOptions()
         options.routing = route == "fallback" ? .fallback : .automatic
         options.appleRendering = route == "apple-linear" ? .linear : .standard
-        options.fallbackMemoryLimitMB = .max  // the Mac has the room; measure the full frame
+        options.fallbackMemoryLimitMB = .max  // measure the full frame
         options.halfSizeAbovePixels = .max  // full resolution on both routes
 
         let context = CIContext()
@@ -81,7 +70,7 @@ enum Bench {
         var rows: [Row] = []
         for url in files {
             guard let info = try? RawInput.info(url) else { continue }
-            // Median of three, to shrug off a cold file cache or a busy machine.
+            // Median of three.
             func median(_ route: String) -> Sample? {
                 let samples = (0..<3).compactMap { _ in child(url, route: route) }.sorted { $0.seconds < $1.seconds }
                 return samples.isEmpty ? nil : samples[samples.count / 2]

@@ -46,7 +46,7 @@ struct PixelCheck {
 /// Reads a developed texture back as rows of linear RGB, row 0 at the top.
 fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture) -> Vec<Vec<[f32; 3]>> {
     let (width, height) = (texture.width(), texture.height());
-    // Rows in a copy are padded to a multiple of 256 bytes; a pixel is 8.
+    // Copy rows are padded to a multiple of 256 bytes. A pixel is 8.
     let padded = (width * 8).div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
@@ -148,7 +148,7 @@ fn wgsl_kernel_passes_the_shared_cases() {
     println!("{} cases passed on {}", document.cases.len(), adapter.get_info().name);
 }
 
-/// End to end on a real file: the core decodes it, the WGSL kernel develops it.
+/// End to end: the core decodes a file and the WGSL kernel develops it.
 #[test]
 fn develops_a_real_file_through_wgpu() {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -164,7 +164,7 @@ fn develops_a_real_file_through_wgpu() {
     let instance = wgpu::Instance::default();
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).expect("a GPU adapter");
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
-    // Half size keeps the read-back small; the full-size path is what the cases above cover.
+    // Half size keeps the read-back small.
     let texture = Developer::new(&device).develop(&device, &queue, &mosaic, &params, true);
     assert_eq!((texture.width(), texture.height()), (params.size[0] / 2, params.size[1] / 2));
 

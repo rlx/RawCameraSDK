@@ -3,12 +3,11 @@ import Foundation
 import ImageIO
 import RawShim
 
-/// How the sensor samples colour. It decides which fallback path develops the file.
+/// How the sensor samples colour.
 public enum RawSensorLayout: String, Sendable, Codable {
-    /// Full colour at every pixel: linear DNG, merged pixel-shift, reduced-size RAW,
-    /// monochrome sensors.
+    /// No mosaic: linear DNG, merged pixel-shift, reduced-size RAW, monochrome sensors.
     case fullColor
-    /// The usual 2x2 mosaic of red, green and blue. Developed on the GPU.
+    /// The 2x2 mosaic of red, green and blue.
     case bayer
     /// Fujifilm's 6x6 mosaic.
     case xTrans
@@ -24,10 +23,9 @@ public struct RawInfo: Sendable, Equatable {
 
     /// Size of the picture in pixels, before `orientation` is applied.
     ///
-    /// From `RawInput.info` this is the sensor's picture area as the file's header describes
-    /// it. On a decoded `RawImage` from the fallback route it is the developed frame at full
-    /// resolution, which differs for the few sensors LibRaw resamples (Fuji SuperCCD,
-    /// non-square pixels). `RawImage.image.extent` is always the image you actually hold.
+    /// From `RawInput.info` this is the picture area in the file's header. On a `RawImage`
+    /// from the fallback route it is the developed frame at full resolution, which differs
+    /// for the few sensors LibRaw resamples.
     public var width: Int
     public var height: Int
 
@@ -41,24 +39,23 @@ public struct RawInfo: Sendable, Equatable {
     public var shutterSeconds: Double?
     /// The f-number.
     public var aperture: Double?
-    /// In millimetres, as recorded; not a 35 mm equivalent.
+    /// In millimetres, as recorded. No 35 mm conversion.
     public var focalLength: Double?
 
-    /// When the picture was taken. Cameras record local time with no zone, and LibRaw
-    /// interprets it in the zone of the device doing the decoding, so treat this as
-    /// approximate to within a day. `nil` when the metadata came from ImageIO.
+    /// When the picture was taken, accurate to within a day: LibRaw reads the camera's
+    /// zoneless local time in the decoding device's zone. `nil` when the metadata came
+    /// from ImageIO.
     public var captureDate: Date?
 
     public var isDNG: Bool
 
-    /// LibRaw's decoding routine, e.g. "fuji_compressed_load_raw()". It is the most precise
-    /// statement of the file's compression mode there is, which makes it the thing to log
-    /// when a file misbehaves. `nil` when the metadata came from ImageIO.
+    /// LibRaw's decoding routine, e.g. "fuji_compressed_load_raw()", which identifies the
+    /// compression mode. `nil` when the metadata came from ImageIO.
     public var decoderRoutine: String?
 
     public var megapixels: Double { Double(width * height) / 1_000_000 }
 
-    /// Make and model without the repetition some cameras bake in ("Canon Canon EOS R5").
+    /// Make and model, without repeating the make ("Canon Canon EOS R5").
     public var camera: String {
         if make.isEmpty { return model.isEmpty ? "Unknown camera" : model }
         return model.lowercased().hasPrefix(make.lowercased()) ? model : "\(make) \(model)"
@@ -88,7 +85,7 @@ public struct RawInfo: Sendable, Equatable {
 }
 
 extension RawInfo {
-    /// A placeholder for a file that decodes but whose metadata nothing can read.
+    /// A placeholder for a file whose metadata cannot be read.
     init(size: CGSize) {
         self.init(width: Int(size.width), height: Int(size.height))
     }
@@ -129,8 +126,7 @@ extension RawInfo {
     }
 
     /// Translates a dcraw flip code. Bit 0 mirrors horizontally, bit 1 mirrors vertically and
-    /// bit 2 swaps rows with columns; cameras only ever write 0, 3, 5 and 6, but the other
-    /// four fall out of the same three bits and cost nothing to get right.
+    /// bit 2 swaps rows with columns. Cameras write only 0, 3, 5 and 6.
     static func orientation(flip: Int32) -> CGImagePropertyOrientation {
         switch flip {
         case 1: .upMirrored

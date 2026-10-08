@@ -29,7 +29,7 @@ func pixels(of image: CIImage) -> [[SIMD3<Float>]] {
     }
 }
 
-/// Proportions of red and green: colour with brightness taken out.
+/// Red and green as fractions of the channel sum.
 func chromaticity(_ color: SIMD3<Float>) -> SIMD2<Float> {
     SIMD2(color.x, color.y) / color.sum()
 }
