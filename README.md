@@ -1,6 +1,6 @@
 # RawInputKit
 
-[![CI](https://github.com/rlx/RawInputKit/actions/workflows/ci.yml/badge.svg)](https://github.com/rlx/RawInputKit/actions/workflows/ci.yml)
+[![CI](https://github.com/rlx/RawCameraSDK/actions/workflows/ci.yml/badge.svg)](https://github.com/rlx/RawCameraSDK/actions/workflows/ci.yml)
 
 A work sample. I took one problem, getting camera RAW files into an editor, and tried to
 answer it with measurements instead of assumptions: how much does Apple's system decoder
@@ -105,7 +105,7 @@ RawInput.open(url)
 Requires Xcode 27.
 
 ```sh
-git clone --recurse-submodules https://github.com/rlx/RawInputKit.git && cd RawInputKit
+git clone --recurse-submodules https://github.com/rlx/RawCameraSDK.git && cd RawCameraSDK
 swift build
 Examples/RawInputDemo/Scripts/fetch-samples.sh    # sample files for the tests, 285 MB
 swift test

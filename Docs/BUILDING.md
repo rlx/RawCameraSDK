@@ -5,8 +5,8 @@ macOS 14 or later. Nothing else is needed for the Swift package; the Rust and We
 bindings need their own toolchains, listed below.
 
 ```sh
-git clone --recurse-submodules https://github.com/rlx/RawInputKit.git
-cd RawInputKit
+git clone --recurse-submodules https://github.com/rlx/RawCameraSDK.git
+cd RawCameraSDK
 ```
 
 LibRaw is a git submodule. If you cloned without `--recurse-submodules`, run
@@ -18,10 +18,13 @@ LibRaw is a git submodule. If you cloned without `--recurse-submodules`, run
 swift build
 ```
 
-To use it in another project, add the package and import `RawInputKit`:
+To use it in another project, add the package and depend on its `RawInputKit` product.
+The repository and the library have different names, so the product has to be named:
 
 ```swift
-.package(url: "https://github.com/rlx/RawInputKit.git", from: "0.1.0")
+.package(url: "https://github.com/rlx/RawCameraSDK.git", from: "0.1.0")
+// and in the target:
+.product(name: "RawInputKit", package: "RawCameraSDK")
 ```
 
 ## The demo app
