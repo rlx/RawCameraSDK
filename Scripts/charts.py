@@ -4,6 +4,7 @@
     Tests/probe-results.json   written by `rawprobe <folder> --json`   -> coverage, agreement
     Tests/bench-results.json   written by `rawprobe bench ... --json`  -> speed (Mac)
     Tests/device-results.json  written by `Scripts/device-bench.py`    -> speed-device
+    Tests/match-results.json   written by `rawprobe match ... --json`  -> route-match
 
 Plain SVG, no dependencies. GitHub shows the right variant through a <picture> element.
 Colours are the first two slots of a colour-blind-validated categorical palette; the same
@@ -19,9 +20,9 @@ DOCS = ROOT / "Docs"
 
 THEMES = {
     "light": {"text": "#0b0b0b", "muted": "#52514e", "grid": "#e4e3df", "surface": "#ffffff",
-              "apple": "#2a78d6", "fallback": "#eb6834", "neither": "#b5b4ac"},
+              "apple": "#2a78d6", "fallback": "#eb6834", "neither": "#b5b4ac", "shared": "#1baf7a"},
     "dark": {"text": "#ffffff", "muted": "#c3c2b7", "grid": "#33332f", "surface": "#0d1117",
-             "apple": "#3987e5", "fallback": "#d95926", "neither": "#6b6a64"},
+             "apple": "#3987e5", "fallback": "#d95926", "neither": "#6b6a64", "shared": "#199e70"},
 }
 FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 BAR = 16  # bar thickness, px
@@ -143,18 +144,45 @@ def agreement(rows):
         svg.text(left + limit * scale / 2, bottom + 36,
                  "chromaticity distance from the embedded preview (0 = identical colour)",
                  anchor="middle", color="muted", size=12)
-        for index, (key, label, values) in enumerate(series):
-            y = top + index * row_height + row_height / 2
-            cuts = statistics.quantiles(values, n=20)  # 5% steps
-            p5, p25, median, p75, p95 = cuts[0], cuts[4], cuts[9], cuts[14], cuts[18]
-            svg.text(left - 12, y + 4.5, label, anchor="end")
-            # Thin bar: the middle 90% of files. Thick bar: the middle half. Dot: the median.
-            svg.bar(left + p5 * scale, y - 2, (p95 - p5) * scale, 4, key, opacity=0.35)
-            svg.bar(left + p25 * scale, y - BAR / 2, (p75 - p25) * scale, BAR, key, opacity=0.6)
-            svg.dot(left + median * scale, y, key)
-            svg.text(left + p95 * scale + 8, y + 4.5, f"median {median:.3f}", color="muted", size=12)
+        range_rows(svg, series, left, top, row_height, scale, "median {:.3f}")
         svg.save("preview-agreement", mode)
     return len(shared)
+
+
+def range_rows(svg, series, left, top, row_height, scale, label_format):
+    """Rows of range bars: thin for the middle 90% of values, thick for the middle half, a
+    dot at the median."""
+    for index, (key, label, values) in enumerate(series):
+        y = top + index * row_height + row_height / 2
+        cuts = statistics.quantiles(values, n=20)  # 5% steps
+        p5, p25, median, p75, p95 = cuts[0], cuts[4], cuts[9], cuts[14], cuts[18]
+        svg.text(left - 12, y + 4.5, label, anchor="end")
+        svg.bar(left + p5 * scale, y - 2, (p95 - p5) * scale, 4, key, opacity=0.35)
+        svg.bar(left + p25 * scale, y - BAR / 2, (p75 - p25) * scale, BAR, key, opacity=0.6)
+        svg.dot(left + median * scale, y, key)
+        svg.text(left + p95 * scale + 8, y + 4.5, label_format.format(median), color="muted", size=12)
+
+
+def route_match(rows):
+    """How different the two decoders' pictures are, before and after the shared rendering."""
+    series = [("neither", "Each decoder's own output", [r["ownOutput"] for r in rows]),
+              ("shared", "Shared rendering, neutral look", [r["sharedNeutral"] for r in rows]),
+              ("shared", "Shared rendering, film look", [r["sharedFilm"] for r in rows])]
+    left, right, top, row_height, limit = 232, 40, 26, 44, 35
+    width, height = 760, top + row_height * len(series) + 44
+    scale = (width - left - right) / limit
+    for mode, theme in THEMES.items():
+        svg = Svg(width, height, theme, "Colour difference between the two decoders' pictures, before and after shared rendering")
+        bottom = top + row_height * len(series)
+        for tick in range(0, limit + 1, 5):
+            x = left + tick * scale
+            svg.line(x, top, x, bottom)
+            svg.text(x, bottom + 18, tick, anchor="middle", color="muted", size=12)
+        svg.text(left + limit * scale / 2, bottom + 36,
+                 "colour difference between the two decoders, ΔE (lower = more alike)",
+                 anchor="middle", color="muted", size=12)
+        range_rows(svg, series, left, top, row_height, scale, "median {:.1f}")
+        svg.save("route-match", mode)
 
 
 def device_rows(results):
@@ -217,6 +245,10 @@ if __name__ == "__main__":
     if bench:
         speed(bench)
         print(f"speed chart ({len(bench)} files)")
+    match = load("match-results.json")
+    if match:
+        route_match(match)
+        print(f"route match chart ({len(match)} files)")
     device = load("device-results.json")
     if device:
         speed(device_rows(device), name="speed-device")

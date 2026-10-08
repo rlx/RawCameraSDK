@@ -28,22 +28,31 @@ enum Develop {
         try? await offload { try RawInput.preview(url, maxPixelSize: 600) }
     }
 
-    static func open(_ url: URL, routing: RawDecodeOptions.Routing) async throws -> RawImage {
+    /// - Parameter sceneLinear: ask Apple's decoder for scene-linear output too, which is
+    ///   what a shared look needs. The fallback's output always is.
+    static func open(_ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool) async throws -> RawImage {
         try await offload {
             var options = RawDecodeOptions()
             options.routing = routing
+            options.appleRendering = sceneLinear ? .linear : .standard
             return try RawInput.open(url, options: options)
         }
     }
 
     /// Renders for the screen, at most `longEdge` pixels on its longer side.
     ///
-    /// Exposure is applied to the linear image and nothing is cached, so each call is the
-    /// operation an editor would run on the decoder's output. Returns `nil` if Core Image
-    /// produces nothing, which is how a file Apple's decoder cannot really develop shows up.
-    static func render(_ raw: RawImage, exposureEV: Double, longEdge: CGFloat = 2400) async -> CGImage? {
+    /// Exposure and the look are applied to the linear image and nothing is cached, so each
+    /// call is the operation an editor would run on the decoder's output. Returns `nil` if
+    /// Core Image produces nothing, which is how a file Apple's decoder cannot really
+    /// develop shows up.
+    ///
+    /// - Parameter look: `nil` shows the decoder's own output, with no shared rendering.
+    static func render(
+        _ raw: RawImage, look: RawLook?, exposureEV: Double, longEdge: CGFloat = 2400
+    ) async -> CGImage? {
         try? await offload {
-            let image = raw.displayImage(exposureEV: exposureEV)
+            let image = look.map { raw.rendered(look: $0, exposureEV: exposureEV) }
+                ?? raw.displayImage(exposureEV: exposureEV)
             let scale = min(1, longEdge / max(image.extent.width, image.extent.height))
             let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
             // Not deferred: by default Core Image would postpone the render until the image

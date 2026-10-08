@@ -17,6 +17,9 @@ struct GalleryView: View {
                         section("Imported", items: library.imported)
                     }
                     section(
+                        "Both decoders open this", items: library.shared,
+                        footnote: "Switch between Apple and Fallback, then between Decoder, Neutral and Film: their own outputs differ, and the shared rendering brings them together.")
+                    section(
                         "Apple's decoder can't open these", items: library.samples,
                         footnote: "Bundled CC0 samples from raw.pixls.us. Each one fails in Apple's RAW engine on this OS and opens through the fallback.")
                 }

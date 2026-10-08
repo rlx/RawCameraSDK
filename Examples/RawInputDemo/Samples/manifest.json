@@ -88,5 +88,15 @@
   "sha256": "c05a4b112936c9ac110af241ca9e1bda089f7456b647f8a13595b604cbdf944c",
   "megabytes": 23.55,
   "license": "CC0-1.0"
+ },
+ {
+  "file": "sony-a9-iii.arw",
+  "camera": "Sony a9 III",
+  "format": "ARW · APS-C crop · 10 MP",
+  "url": "https://raw.pixls.us/getfile.php/7367/nice/Sony - ILCE-9M3 - 14bit (3:2).ARW",
+  "sha256": "87a66c6be1fe91a4a5d1c626167ce58d0ed2953192005a9879f78b9af51fbfd5",
+  "megabytes": 12.84,
+  "license": "CC0-1.0",
+  "group": "shared"
  }
 ]

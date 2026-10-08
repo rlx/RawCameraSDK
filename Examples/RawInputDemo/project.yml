@@ -66,7 +66,33 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         CODE_SIGN_STYLE: Automatic
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+  # Drives the app through its story. Also the script for the README's screen recording.
+  RawInputDemoUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS]
+    sources:
+      - UITests
+    dependencies:
+      - target: RawInputDemo
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rawinputkit.demo.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: RawInputDemo
+        CODE_SIGN_STYLE: Automatic
 schemes:
+  # Kept apart from the unit tests: it needs a simulator on screen and takes a minute.
+  RawInputDemoUITests:
+    build:
+      targets:
+        RawInputDemo: all
+        RawInputDemoUITests: [test]
+    test:
+      # Release, so the walkthrough shows the decoders at their real speed.
+      config: Release
+      targets:
+        - RawInputDemoUITests
   RawInputDemo:
     build:
       targets:

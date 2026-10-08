@@ -30,6 +30,10 @@ enum Benchmark {
         var openSeconds = 0.0
         /// Open plus rendering the whole frame to 8-bit sRGB: what an export pays.
         var totalSeconds = 0.0
+        /// The same again, a second time in the same process. The first decode in a process
+        /// also pays for one-off setup (shader compilation, and for some cameras loading
+        /// Apple's machine-learning models); this is what every later file costs.
+        var secondTotalSeconds = 0.0
         var peakMegabytes = 0.0
         var error = ""
         var device = ""
@@ -51,7 +55,6 @@ enum Benchmark {
         } else {
             result.error = "file not found in the app bundle or Documents"
         }
-        result.peakMegabytes = peakFootprintMegabytes()
 
         let line = (try? JSONEncoder().encode(result)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         print("RAWBENCH \(line)")
@@ -94,6 +97,14 @@ enum Benchmark {
             let rendered = FullRender.run(raw.image, context: CIContext())
             result.totalSeconds = seconds(since: start)
             if !rendered { result.error = "nothing was rendered" }
+            // Read now, before the second pass: the high-water mark cannot be reset, and
+            // two decodes in one process would report the pair's peak, not one decode's.
+            result.peakMegabytes = peakFootprintMegabytes()
+
+            start = clock.now
+            let again = try RawInput.open(url, options: options)
+            _ = FullRender.run(again.image, context: CIContext())
+            result.secondTotalSeconds = seconds(since: start)
         } catch {
             result.error = error.localizedDescription
         }

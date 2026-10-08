@@ -11,8 +11,9 @@ import RawInputKit
 /// - **A decode belongs to a generation.** Choosing another decoder starts a new
 ///   generation, and a result from an older one is dropped on arrival.
 /// - **One render at a time, always of the latest request.** Slider movements do not queue
-///   renders. A single loop renders the current exposure, then checks whether it changed
-///   meanwhile. However fast the slider moves, the last value is the one left on screen.
+///   renders. A single loop renders the current exposure and look, then checks whether
+///   either changed meanwhile. However fast the slider moves, the last value is the one
+///   left on screen.
 @MainActor
 @Observable
 final class DetailModel {
@@ -27,23 +28,37 @@ final class DetailModel {
         didSet { if exposure != oldValue { startRendering() } }
     }
 
+    /// The shared rendering applied after the decoder; `nil` shows the decoder's own output.
+    var look: RawLook? {
+        didSet { if look != oldValue { startRendering() } }
+    }
+
+    /// What a render is asked for, and what `rendered` currently shows.
+    private struct Request: Equatable {
+        var generation: Int
+        var exposure: Double
+        var look: RawLook?
+    }
+
     private var generation = 0
     private var isRendering = false
-    /// What `rendered` shows, so the loop knows when it has caught up.
-    private var shown: (generation: Int, exposure: Double)?
+    private var shown: Request?
+    private var wanted: Request { Request(generation: generation, exposure: exposure, look: look) }
 
     func loadPreview(_ url: URL) async {
         preview = await Develop.thumbnail(url)
     }
 
-    func decode(_ url: URL, routing: RawDecodeOptions.Routing) async {
+    /// - Parameter sceneLinear: see `Develop.open`. Changing it means decoding again, because
+    ///   it changes what Apple's decoder is asked for.
+    func decode(_ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool) async {
         generation += 1
         let mine = generation
         raw = nil
         rendered = nil
         failure = nil
         do {
-            let decoded = try await Develop.open(url, routing: routing)
+            let decoded = try await Develop.open(url, routing: routing, sceneLinear: sceneLinear)
             guard mine == generation else { return }
             raw = decoded
             await renderUntilCurrent()
@@ -65,9 +80,13 @@ final class DetailModel {
         isRendering = true
         defer { isRendering = false }
 
-        while let raw, shown?.generation != generation || shown?.exposure != exposure {
-            let request = (generation: generation, exposure: exposure)
-            let image = await Develop.render(raw, exposureEV: request.exposure)
+        while let raw, shown != wanted {
+            let request = wanted
+            // A look needs scene-linear data. While the decode that will supply it is still
+            // on its way, the image in hand is Apple's finished rendering; show it as it is
+            // instead of stacking a second tone curve on top.
+            let look = raw.isSceneLinear ? request.look : nil
+            let image = await Develop.render(raw, look: look, exposureEV: request.exposure)
             // The decoder was switched while this rendered: the image belongs to a file
             // state that is gone. Go round again with whatever is current now.
             guard request.generation == generation else { continue }

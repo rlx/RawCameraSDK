@@ -14,6 +14,8 @@ private struct Sample: Decodable {
     let file: String
     let camera: String
     let format: String
+    /// "shared" marks a file both decoders open; absent for the ones only the fallback does.
+    let group: String?
 }
 
 /// The files the gallery shows: the bundled samples and whatever the user imports.
@@ -22,6 +24,8 @@ private struct Sample: Decodable {
 final class Library {
     /// Bundled files that Apple's decoder rejects on this OS.
     private(set) var samples: [RawItem] = []
+    /// A bundled file both decoders open: the one to compare them on.
+    private(set) var shared: [RawItem] = []
     private(set) var imported: [RawItem] = []
     /// Set when an import fails, for the gallery to show.
     var importFailure: String?
@@ -32,9 +36,13 @@ final class Library {
               let entries = try? JSONDecoder().decode([Sample].self, from: data),
               let folder = Bundle.main.resourceURL?.appending(path: "files")
         else { return }
-        samples = entries.map {
-            RawItem(url: folder.appending(path: $0.file), title: $0.camera, detail: $0.format)
+        func items(shared: Bool) -> [RawItem] {
+            entries.filter { ($0.group == "shared") == shared }.map {
+                RawItem(url: folder.appending(path: $0.file), title: $0.camera, detail: $0.format)
+            }
         }
+        samples = items(shared: false)
+        shared = items(shared: true)
     }
 
     /// Copies picked files into the app's temporary folder and lists them.

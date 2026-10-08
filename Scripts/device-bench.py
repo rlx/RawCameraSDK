@@ -28,6 +28,7 @@ much they tell you, and the list is cut where the limit falls:
 `--limit 0` removes the cap. The figures in the README came from `--limit 0 --runs 3`.
 
 Writes Tests/device-results.json: one row per file and route, the median of the runs.
+Rows a limited session does not reach are carried over from the previous results.
 """
 import json
 import statistics
@@ -139,8 +140,14 @@ def main():
         outcome = row.get("error") or f"{row['totalSeconds']:.2f} s, {row['peakMegabytes']:.0f} MB peak"
         print(f"{row.get('camera') or name} [{route}]: {outcome}", flush=True)
 
-    (ROOT / "Tests" / "device-results.json").write_text(json.dumps(rows, indent=1, sort_keys=True) + "\n")
-    print(f"{len(rows)} rows -> Tests/device-results.json")
+    # A limited session measures part of the list. Rows it did not reach are kept from the
+    # previous results instead of being dropped, so the file always describes every file.
+    path = ROOT / "Tests" / "device-results.json"
+    measured = {(row["file"], row["route"]) for row in rows}
+    kept = [row for row in (json.loads(path.read_text()) if path.exists() else [])
+            if (row["file"], row["route"]) not in measured]
+    path.write_text(json.dumps(rows + kept, indent=1, sort_keys=True) + "\n")
+    print(f"{len(rows)} rows measured, {len(kept)} kept from earlier runs -> Tests/device-results.json")
 
 
 if __name__ == "__main__":

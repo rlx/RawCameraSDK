@@ -21,9 +21,33 @@ struct DetailView: View {
         }
     }
 
-    // `-route Apple` or `-route Fallback` on the command line picks the starting decoder;
-    // with `-openSample` (see GalleryView) it scripts a screenshot.
+    /// What happens after the decoder. "Decoder" shows each decoder's own output, which is
+    /// where the two visibly differ; the other two put both through the same `RawLook`.
+    private enum Rendering: String, CaseIterable, Identifiable {
+        case decoder = "Decoder"
+        case neutral = "Neutral"
+        case film = "Film"
+
+        var id: Self { self }
+        var look: RawLook? {
+            switch self {
+            case .decoder: nil
+            case .neutral: .neutral
+            case .film: .film
+            }
+        }
+    }
+
+    /// A decode is needed again when either of these changes.
+    private struct DecodeKey: Hashable {
+        var choice: Choice
+        var sceneLinear: Bool
+    }
+
+    // `-route Apple` or `-route Fallback` and `-look Neutral` or `-look Film` on the command
+    // line pick the starting state; with `-openSample` (see GalleryView) they script a screenshot.
     @State private var choice = UserDefaults.standard.string(forKey: "route").flatMap(Choice.init) ?? .automatic
+    @State private var rendering = UserDefaults.standard.string(forKey: "look").flatMap(Rendering.init) ?? .decoder
     @State private var model = DetailModel()
 
     var body: some View {
@@ -36,7 +60,10 @@ struct DetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await model.loadPreview(item.url) }
-        .task(id: choice) { await model.decode(item.url, routing: choice.routing) }
+        .task(id: DecodeKey(choice: choice, sceneLinear: rendering.look != nil)) {
+            await model.decode(item.url, routing: choice.routing, sceneLinear: rendering.look != nil)
+        }
+        .onChange(of: rendering, initial: true) { model.look = rendering.look }
     }
 
     private var canvas: some View {
@@ -71,6 +98,12 @@ struct DetailView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
+            Picker("Rendering", selection: $rendering) {
+                ForEach(Rendering.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
             if let raw = model.raw {
                 HStack(spacing: 8) {
                     Text(raw.decoder)
@@ -82,15 +115,22 @@ struct DetailView: View {
                     Text(stats(raw)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
                 Text(metadata(raw.info)).font(.caption).foregroundStyle(.secondary)
+                if raw.isColorSuspect {
+                    // The fallback compared its result with the camera's embedded preview
+                    // and they disagree; see RawImage.isColorSuspect.
+                    Label("Colours may be off: they differ from the camera's own preview.", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
 
                 HStack {
                     Image(systemName: "plusminus.circle")
                     Slider(value: $model.exposure, in: -3...3)
+                        .accessibilityLabel("Exposure")
                     Text(model.exposure, format: .number.precision(.fractionLength(1)).sign(strategy: .always()))
                         .font(.caption).monospacedDigit().frame(width: 36, alignment: .trailing)
+                        .accessibilityHidden(true)  // the slider already speaks its value
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Exposure")
             }
         }
         .padding()
