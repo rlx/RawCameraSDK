@@ -83,9 +83,13 @@ xcodebuild test -scheme RawInputKit-Package -destination 'platform=iOS Simulator
 code of the Apple developer team that signs the build; a free personal team works.
 
 ```sh
-Scripts/device-tests.sh <device-udid> <team-id>     # the same 32 tests, on the device
-Scripts/device-bench.py <device-udid>               # timings and peak memory: 15 app launches
-Scripts/device-bench.py <device-udid> --limit 0 --runs 3   # the full set behind the tables below: 102 launches
+# The same 32 tests, on the device.
+Scripts/device-tests.sh <device-udid> <team-id>
+
+# Timings and peak memory. 15 app launches by default;
+# the second form is the full set behind the tables below, 102 launches.
+Scripts/device-bench.py <device-udid>
+Scripts/device-bench.py <device-udid> --limit 0 --runs 3
 ```
 
 The tests run inside the demo app, because a device cannot run a Swift package's tests
