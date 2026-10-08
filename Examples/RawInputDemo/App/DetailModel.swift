@@ -22,6 +22,8 @@ final class DetailModel {
     private(set) var rendered: CGImage?
     private(set) var failure: String?
     private(set) var memoryMB = 0.0
+    /// How long `RawInput.open` took for the image on screen.
+    private(set) var openSeconds = 0.0
 
     /// Stops of exposure added on top of the decoder's suggestion.
     var exposure = 0.0 {
@@ -60,7 +62,8 @@ final class DetailModel {
         do {
             let decoded = try await Develop.open(url, routing: routing, sceneLinear: sceneLinear)
             guard mine == generation else { return }
-            raw = decoded
+            raw = decoded.image
+            openSeconds = decoded.seconds
             await renderUntilCurrent()
             memoryMB = Develop.memoryFootprintMB
         } catch {

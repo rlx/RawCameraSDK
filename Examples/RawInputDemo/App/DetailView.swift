@@ -139,7 +139,7 @@ struct DetailView: View {
 
     private func stats(_ raw: RawImage) -> String {
         let size = "\(Int(raw.image.extent.width)) x \(Int(raw.image.extent.height))"
-        let time = raw.openSeconds.formatted(.number.precision(.fractionLength(2)))
+        let time = model.openSeconds.formatted(.number.precision(.fractionLength(2)))
         let half = raw.isHalfSize ? " (half size)" : ""
         // "open" and not "decode": Apple's decoder defers its work to render time, so the
         // figure is only comparable between fallback paths.

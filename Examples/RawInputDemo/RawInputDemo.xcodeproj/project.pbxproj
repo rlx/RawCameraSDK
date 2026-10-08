@@ -24,7 +24,6 @@
 		DC03D4E045BC7054153BB317 /* Benchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FCD6F407EB09BF8092A662 /* Benchmark.swift */; };
 		E18AC672F33C44A729C2EF38 /* KernelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9973DCABE80E5FA02F1A8F3E /* KernelTests.swift */; };
 		F8F397B8E8017F803BA31BFA /* files in Resources */ = {isa = PBXBuildFile; fileRef = 1D955F60E9C3B59DDC506862 /* files */; };
-		FBBFC3BD37F3C29E7A952A0D /* FullRender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E54157FECE514157866926C /* FullRender.swift */; };
 		FF37BB08D0CDEDC3AA23415C /* Develop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B95637202EE40E0F876EB48 /* Develop.swift */; };
 /* End PBXBuildFile section */
 
@@ -51,7 +50,6 @@
 		1D955F60E9C3B59DDC506862 /* files */ = {isa = PBXFileReference; lastKnownFileType = folder; name = files; path = Samples/files; sourceTree = SOURCE_ROOT; };
 		2592D3E274E3C914EE4559E9 /* RawInputDemoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawInputDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		348380FCE54246337B1FFF10 /* LookTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookTests.swift; sourceTree = "<group>"; };
-		3E54157FECE514157866926C /* FullRender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullRender.swift; sourceTree = "<group>"; };
 		44900FFE24A79B314A857DC1 /* vsco_lib */ = {isa = PBXFileReference; lastKnownFileType = folder; name = vsco_lib; path = ../..; sourceTree = SOURCE_ROOT; };
 		4B95637202EE40E0F876EB48 /* Develop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Develop.swift; sourceTree = "<group>"; };
 		4BAFB2AC0BE43AD6B919BAD6 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
@@ -139,7 +137,6 @@
 				B1DBB02B212D106C94472D6D /* DetailModel.swift */,
 				4BAFB2AC0BE43AD6B919BAD6 /* DetailView.swift */,
 				4B95637202EE40E0F876EB48 /* Develop.swift */,
-				3E54157FECE514157866926C /* FullRender.swift */,
 				AE559389E18E21056D588863 /* GalleryView.swift */,
 				B4452341A7B442F28FCF987B /* Library.swift */,
 				D4B74186889C14307364DA58 /* RawInputDemoApp.swift */,
@@ -315,7 +312,6 @@
 				40911A24DE2EAEEB053ED534 /* DetailModel.swift in Sources */,
 				91829409C0647150F437D8A6 /* DetailView.swift in Sources */,
 				FF37BB08D0CDEDC3AA23415C /* Develop.swift in Sources */,
-				FBBFC3BD37F3C29E7A952A0D /* FullRender.swift in Sources */,
 				A1637B190D278BFC7EB63C4C /* GalleryView.swift in Sources */,
 				C57C14E30D52FED5A53BC5FE /* Library.swift in Sources */,
 				D3B4711775B43D7BD213FD3A /* RawInputDemoApp.swift in Sources */,

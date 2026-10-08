@@ -80,10 +80,12 @@ enum Benchmark {
 
         var options = RawDecodeOptions()
         options.routing = route == "fallback" ? .fallback : .automatic
-        // "apple" measures Apple's decoder alone, without this library's support check in
-        // front of it; "automatic" is what an app calling `RawInput.open` would pay.
+        options.appleRendering = route == "apple-linear" ? .linear : .standard
+        // "apple" and "apple-linear" measure Apple's decoder alone, without this library's
+        // support check in front of it; "automatic" is what an app calling `RawInput.open`
+        // would pay.
         func open() throws -> RawImage {
-            try route == "apple"
+            try route.hasPrefix("apple")
                 ? RawInput.openAppleUnchecked(url, options: options)
                 : RawInput.open(url, options: options)
         }
@@ -97,16 +99,16 @@ enum Benchmark {
             result.width = Int(raw.image.extent.width)
             result.height = Int(raw.image.extent.height)
             result.isHalfSize = raw.isHalfSize
-            let rendered = FullRender.run(raw.image, context: CIContext())
+            let rendered = RawMeasurement.renderFully(raw.image, context: CIContext())
             result.totalSeconds = seconds(since: start)
             if !rendered { result.error = "nothing was rendered" }
             // Read now, before the second pass: the high-water mark cannot be reset, and
             // two decodes in one process would report the pair's peak, not one decode's.
-            result.peakMegabytes = peakFootprintMegabytes()
+            result.peakMegabytes = RawMeasurement.memoryFootprint.peakMB
 
             start = clock.now
             let again = try open()
-            _ = FullRender.run(again.image, context: CIContext())
+            _ = RawMeasurement.renderFully(again.image, context: CIContext())
             result.secondTotalSeconds = seconds(since: start)
         } catch {
             result.error = error.localizedDescription
@@ -120,17 +122,6 @@ enum Benchmark {
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appending(path: name),
         ]
         return candidates.compactMap { $0 }.first { FileManager.default.fileExists(atPath: $0.path) }
-    }
-
-    private static func peakFootprintMegabytes() -> Double {
-        var info = task_vm_info_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-        let status = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-            }
-        }
-        return status == KERN_SUCCESS ? Double(info.ledger_phys_footprint_peak) / 1_048_576 : 0
     }
 
     /// The hardware identifier, e.g. "iPhone17,2".

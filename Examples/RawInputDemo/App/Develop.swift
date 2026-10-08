@@ -1,6 +1,6 @@
 import CoreImage
 import Foundation
-import RawInputKit
+@_spi(Measurement) import RawInputKit
 
 /// Runs RawInputKit's blocking calls off the main thread for the views.
 ///
@@ -9,9 +9,9 @@ import RawInputKit
 /// Swift's cooperative thread pool, which is sized to the CPU count and is not meant to be
 /// blocked.
 ///
-/// A decode in flight cannot be interrupted, so cancellation here means two things: work
-/// that has not started is skipped, and callers discard results they no longer want. See
-/// `DetailModel` for the second half.
+/// Cancellation reaches the work in three ways: work that has not started is skipped, a
+/// fallback decode in flight is abandoned between stages (the slow ones take seconds), and
+/// callers discard results they no longer want. See `DetailModel` for the last.
 enum Develop {
     private static let queue = DispatchQueue(label: "RawInputDemo.develop", qos: .userInitiated, attributes: .concurrent)
     private static let context = CIContext()
@@ -30,12 +30,25 @@ enum Develop {
 
     /// - Parameter sceneLinear: ask Apple's decoder for scene-linear output too, which is
     ///   what a shared look needs. The fallback's output always is.
-    static func open(_ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool) async throws -> RawImage {
-        try await offload {
-            var options = RawDecodeOptions()
-            options.routing = routing
-            options.appleRendering = sceneLinear ? .linear : .standard
-            return try RawInput.open(url, options: options)
+    static func open(
+        _ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool
+    ) async throws -> (image: RawImage, seconds: Double) {
+        // The decode runs on a dispatch queue, outside the task, so it cannot see the
+        // task's cancellation directly; a flag carries it across.
+        let cancelled = Flag()
+        return try await withTaskCancellationHandler {
+            try await offload {
+                var options = RawDecodeOptions()
+                options.routing = routing
+                options.appleRendering = sceneLinear ? .linear : .standard
+                options.isCancelled = { cancelled.isSet }
+                let start = ContinuousClock.now
+                let image = try RawInput.open(url, options: options)
+                let elapsed = (ContinuousClock.now - start).components
+                return (image, Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18)
+            }
+        } onCancel: {
+            cancelled.set()
         }
     }
 
@@ -74,16 +87,15 @@ enum Develop {
         }
     }
 
-    /// Physical memory the app is using right now, in megabytes: the figure iOS judges an
-    /// app by when it decides what to terminate.
-    static var memoryFootprintMB: Double {
-        var info = task_vm_info_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-        let result = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-            }
-        }
-        return result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : 0
-    }
+    /// Physical memory the app is using right now, in megabytes.
+    static var memoryFootprintMB: Double { RawMeasurement.memoryFootprint.currentMB }
+}
+
+/// A boolean that can be set from one thread and read from another.
+private final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    var isSet: Bool { lock.withLock { value } }
+    func set() { lock.withLock { value = true } }
 }
