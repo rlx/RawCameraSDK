@@ -37,7 +37,9 @@ public struct RawDecodeOptions: Sendable {
     /// width and height, by merging each 2x2 cell of the mosaic into one pixel.
     ///
     /// This exists for memory. A developed frame is held as 16-bit float RGBA, 8 bytes per
-    /// pixel, so 100 MP needs about 800 MB: more than an iPhone will give a foreground app.
+    /// pixel, so 100 MP needs about 800 MB before anything is done with it. A recent iPhone
+    /// with 8 GB tolerated more than that in testing; older phones have half the memory or
+    /// less, and the threshold is set for them.
     ///
     /// It is a threshold, not a cap. The frame is halved once, and only mosaic sensors can
     /// be halved; Foveon, monochrome and already-demosaiced files come out at full size
@@ -50,8 +52,9 @@ public struct RawDecodeOptions: Sendable {
     ///
     /// The fallback can decode a file without error and still get its colours wrong, most
     /// often for a camera newer than LibRaw's tables. This is how a caller finds out. It
-    /// costs one small JPEG decode and two tiny renders, a few tens of milliseconds; turn
-    /// it off for bulk work where nobody will act on the answer.
+    /// costs one small JPEG decode and two tiny renders: together with measuring exposure,
+    /// 0.04 to 0.12 s on an iPhone 16 Pro Max, the high end for files whose embedded
+    /// preview is full-size. Turn it off for bulk work where nobody will act on the answer.
     public var checksColorAgainstPreview = true
 
     public init() {}

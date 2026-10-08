@@ -11,13 +11,13 @@ Apple ships a RAW decoder (`CIRAWFilter`) that handles most cameras and is the b
 when it works. It does not open everything. RawInputKit puts a second decoder behind it,
 built on LibRaw, and gives callers one function that tries Apple first and falls back when
 it has to. The engineering is in three places: knowing reliably when Apple's decoder will
-*not* work, developing LibRaw's sensor data into an image without shipping GPL code, and
-proving with measurements which files each decoder really handles.
+*not* work, developing LibRaw's sensor data into an image quickly, and proving with
+measurements which files each decoder really handles.
 
 ## Map of the repository
 
 ```
-Package.swift                  four targets, described below
+Package.swift                  five targets, described below
 Vendor/LibRaw/                 LibRaw 0.22.2, unmodified, a git submodule
 Sources/
   RawShim/                     C boundary over LibRaw            (C++, about 300 lines)
@@ -96,10 +96,11 @@ for a camera it knows in a mode it does not, it can return an image that only tu
 be empty when rendered. So `AppleRawDecoder.canDecode` asks for real pixels: a 64-pixel
 square from the middle of the frame.
 
-That is not cheap. Apple's engine still decompresses the sensor data up to that region,
-0.1 to 0.25 s on a Mac, and scaling the picture down instead saves nothing because the
-engine demosaics everything before it shrinks. Paying that on every open would nearly
-double the cost of the files Apple supports. `AppleSupport` therefore keys the answer on
+That is not cheap. Apple's engine still decompresses the sensor data up to that region, and
+scaling the picture down instead saves nothing because the engine demosaics everything
+before it shrinks. Measured on a Mac in a fresh process, opening through the check takes
+0.1 to 0.7 s longer than calling Apple's decoder directly. Paying that on every open would
+add a large fraction to the cost of the files Apple supports. `AppleSupport` therefore keys the answer on
 camera model, LibRaw's decoding routine and frame size, tests the first file of each kind,
 and reuses the answer for the rest of the process's life. Its header comment states what
 that gives up.
@@ -108,8 +109,9 @@ that gives up.
 
 LibRaw can do the whole job on the CPU, and for unusual sensors it should: its pipeline
 knows per-camera corrections that took its authors two decades to collect. But it is
-single-threaded and slow, and its better demosaic algorithms are GPL, which this project
-cannot ship. Plain Bayer sensors are the bulk of real files and need nothing camera-specific
+single-threaded, and seconds per frame where a GPU needs tenths. (The best-known demosaic
+algorithms, AMaZE and RCD, are GPL and are in neither LibRaw's shipped tree nor this
+project.) Plain Bayer sensors are the bulk of real files and need nothing camera-specific
 beyond numbers LibRaw hands over (black level, white level, white balance, a 3x3 matrix), so
 for those LibRaw only decompresses and a Metal kernel does the rest.
 
@@ -193,13 +195,15 @@ benchmark got this wrong and reported Apple's decoder as several times faster th
 
 **Hostile input.** RAW files come from cards, downloads and other people. Every size, margin
 and level that reaches the kernel is validated in the shim first; non-finite values are
-dropped before they reach integer conversion; truncated data is reported as
-`RawError.corruptData` instead of being developed into noise.
+dropped before they reach integer conversion; data LibRaw reports as corrupt becomes
+`RawError.corruptData` instead of being developed into noise. LibRaw does not report a
+short read of an uncompressed format, so those truncated files still decode, with the
+missing rows empty. Catching that needs a datastream that notices short reads.
 
 ## Tests
 
-`swift test` runs everything. Suites that need files skip themselves with a message saying
-how to fetch them. `Scripts/device-tests.sh` runs the same sources on a physical device,
+`swift test` runs everything. Suites that need files that are not there skip themselves
+with a message saying how to fetch them. `Scripts/device-tests.sh` runs the same sources on a physical device,
 hosted in the demo app (the `RawInputDemoTests` target), since a device cannot run a
 package's tests directly; `Fixtures.swift` explains where the files come from there.
 
@@ -209,9 +213,9 @@ package's tests directly; `Fixtures.swift` explains where the files come from th
 | Exposure estimate, Metadata | nothing | Small pure functions, including the non-finite input that would otherwise crash |
 | Looks | nothing | The look's maths (monotonic, neutral greys stay neutral), its lookup-table layout, and that Core Image applies what the maths says |
 | Preview agreement | nothing | A colour cast or a flipped picture is flagged; a brightness change alone is not |
-| Robustness | nothing (truncation uses the samples) | Missing, empty, random and truncated files fail cleanly |
+| Robustness | nothing (truncation uses the samples) | Missing, empty and random files are refused with an error; truncated files do not crash (whether they are refused depends on the format, see the README's limits) |
 | Bundled samples | `fetch-samples.sh`, 285 MB | Each of the ten fails on Apple, develops on the fallback, and passes the fallback's own colour check |
-| Decoder agreement | the same, plus `corpus.py fetch --only DMC-LX10`, 20 MB | The two routes agree on size, colour and in-camera crop, and come closer together after a shared look |
+| Decoder agreement | the same, plus `corpus.py fetch --only DMC-LX10_-_1_1`, 22 MB | The two routes agree on size, colour and in-camera crop, and come closer together after a shared look |
 
 The kernel tests exist because real photographs cannot catch the bugs that matter there: an
 image developed with the Bayer pattern off by one pixel, or upside down, still looks like a
@@ -228,7 +232,8 @@ Two more kinds of test live outside `swift test`:
   replacement for coverage-guided fuzzing of LibRaw.
 
 CI (`.github/workflows/ci.yml`) builds the package, runs `swift test` with the sample
-files, and builds the demo for iOS, on GitHub's Xcode 27 image.
+files (but not the crop-test file, so that one test skips), and builds the demo for iOS, on
+GitHub's Xcode 27 image, for pushes to `main` and pull requests.
 
 `appleRejectsIt` will start failing when an OS update teaches Apple's decoder one of the
 sample formats. That is expected: swap the sample for another file from

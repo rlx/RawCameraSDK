@@ -5,9 +5,12 @@ import Testing
 import simd
 @testable import RawInputKit
 
-/// The ten files the demo ships with. Together they are the claim the project makes:
-/// Apple's decoder cannot open these, and the fallback can.
-@Suite("Bundled samples")
+/// The ten bundled files that only the fallback opens. Together they are the claim the
+/// project makes: Apple's decoder cannot open these, and the fallback can.
+///
+/// With no sample files at all the suite is skipped, with the command that fetches them;
+/// with some but not all, `allTenArePresent` fails, because a partial set is a mistake.
+@Suite("Bundled samples", .enabled(if: !Fixtures.samples.isEmpty, "run Examples/RawInputDemo/Scripts/fetch-samples.sh"))
 struct SampleTests {
     @Test func allTenArePresent() {
         #expect(Fixtures.samples.count == 10, "run Examples/RawInputDemo/Scripts/fetch-samples.sh")

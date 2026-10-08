@@ -25,6 +25,24 @@ public enum RawInput {
     /// - Throws: `RawError`. With `.automatic` routing the error describes why the fallback
     ///   failed, since that is the decoder of last resort.
     public static func open(_ url: URL, options: RawDecodeOptions = RawDecodeOptions()) throws -> RawImage {
+        try open(url, options: options, checksAppleSupport: true)
+    }
+
+    /// Opens with Apple's decoder without first testing that it can develop the file.
+    ///
+    /// For benchmarks only. `open` with `.apple` routing tests the file first, and that
+    /// test costs a good part of a decode; a measurement of Apple's decoder that included
+    /// it would be measuring this library, not the decoder. The price of skipping it is
+    /// the one the test exists to prevent: an unsupported file comes back as an image that
+    /// renders as nothing.
+    @_spi(Measurement)
+    public static func openAppleUnchecked(_ url: URL, options: RawDecodeOptions = RawDecodeOptions()) throws -> RawImage {
+        var options = options
+        options.routing = .apple
+        return try open(url, options: options, checksAppleSupport: false)
+    }
+
+    private static func open(_ url: URL, options: RawDecodeOptions, checksAppleSupport: Bool) throws -> RawImage {
         guard FileManager.default.isReadableFile(atPath: url.path) else { throw RawError.fileUnreadable(url) }
         let clock = ContinuousClock()
         let start = clock.now
@@ -40,7 +58,7 @@ public enum RawInput {
         case .apple:
             // An explicit request is still checked. `CIRAWFilter` is lazy: for a file it
             // cannot develop it may return an image that only fails, silently, at render time.
-            guard appleCanDecode(url) else { throw RawError.appleCannotDecode }
+            guard !checksAppleSupport || appleCanDecode(url) else { throw RawError.appleCannotDecode }
             useApple = true
         case .fallback:
             useApple = false

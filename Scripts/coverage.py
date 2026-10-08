@@ -6,6 +6,8 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
+from brands import brand
+
 ROOT = Path(__file__).resolve().parent.parent
 # Above this chromaticity distance from the embedded preview, a decode is treated as
 # suspect: it opened, but black level, white balance or geometry is probably wrong.
@@ -68,7 +70,7 @@ out = [
 ]
 groups = defaultdict(list)
 for row in fallback_only:
-    groups[(pool[row["file"]]["make"], extension(row))].append(row)
+    groups[(brand(pool[row["file"]]["make"]), extension(row))].append(row)
 for (make, ext), members in sorted(groups.items(), key=lambda item: (-len(item[1]), item[0])):
     cameras = sorted({r["camera"] for r in members})
     shown = ", ".join(cameras[:6]) + (f" and {len(cameras) - 6} more" if len(cameras) > 6 else "")

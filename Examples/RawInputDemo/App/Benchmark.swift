@@ -1,13 +1,13 @@
 import CoreImage
 import Foundation
-import RawInputKit
+@_spi(Measurement) import RawInputKit
 
 /// Headless measurement mode, for timing the decoders on a real device.
 ///
 ///     RawInputDemo -benchmarkFile samsung-nx1.srw -benchmarkRoute fallback
 ///
 /// The app decodes that one file, renders every pixel, prints one line of JSON prefixed
-/// with `RAWBENCH` and exits. `Scripts/device-bench.sh` launches it once per file and
+/// with `RAWBENCH` and exits. `Scripts/device-bench.py` launches it once per file and
 /// route through `devicectl` and collects the lines.
 ///
 /// One measurement per launch is deliberate. Peak memory is a lifetime high-water mark
@@ -31,8 +31,8 @@ enum Benchmark {
         /// Open plus rendering the whole frame to 8-bit sRGB: what an export pays.
         var totalSeconds = 0.0
         /// The same again, a second time in the same process. The first decode in a process
-        /// also pays for one-off setup (shader compilation, and for some cameras loading
-        /// Apple's machine-learning models); this is what every later file costs.
+        /// also pays for one-off setup, such as shader compilation and whatever Apple's
+        /// engine prepares per camera; this is what every later file costs.
         var secondTotalSeconds = 0.0
         var peakMegabytes = 0.0
         var error = ""
@@ -79,16 +79,19 @@ enum Benchmark {
         result.previewSeconds = seconds(since: start)
 
         var options = RawDecodeOptions()
-        switch route {
-        case "apple": options.routing = .apple
-        case "fallback": options.routing = .fallback
-        default: options.routing = .automatic
+        options.routing = route == "fallback" ? .fallback : .automatic
+        // "apple" measures Apple's decoder alone, without this library's support check in
+        // front of it; "automatic" is what an app calling `RawInput.open` would pay.
+        func open() throws -> RawImage {
+            try route == "apple"
+                ? RawInput.openAppleUnchecked(url, options: options)
+                : RawInput.open(url, options: options)
         }
         // Everything else is left at its default, half-size threshold included: this
         // measures what the library does on the device, not what it could be pushed to.
         start = clock.now
         do {
-            let raw = try RawInput.open(url, options: options)
+            let raw = try open()
             result.openSeconds = seconds(since: start)
             result.decoder = raw.decoder
             result.width = Int(raw.image.extent.width)
@@ -102,7 +105,7 @@ enum Benchmark {
             result.peakMegabytes = peakFootprintMegabytes()
 
             start = clock.now
-            let again = try RawInput.open(url, options: options)
+            let again = try open()
             _ = FullRender.run(again.image, context: CIContext())
             result.secondTotalSeconds = seconds(since: start)
         } catch {

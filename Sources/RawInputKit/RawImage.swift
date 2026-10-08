@@ -75,7 +75,8 @@ public struct RawImage: Sendable {
 
     /// Wall-clock time `RawInput.open` took. The two routes do different amounts of work
     /// inside `open`: the fallback decodes and develops everything, while Apple's decoder
-    /// defers nearly all of it to render time. Use it to compare fallback paths with each
+    /// defers the decode itself to render time and spends `open` on set-up and, for the
+    /// first file of each kind, the support check. Use it to compare fallback paths with each
     /// other, not to compare the routes; `rawprobe bench` does that properly.
     public let openSeconds: Double
 

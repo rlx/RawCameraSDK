@@ -64,9 +64,9 @@ enum AppleRawDecoder {
     /// scale. That is cheaper than a scaled-down version of the whole picture, because
     /// `scaleFactor` still has the engine demosaic every pixel before shrinking, while a
     /// small region lets Core Image skip the tiles it does not need. The sensor data still
-    /// has to be decompressed up to that region, so this is not free: measured at 0.1 to
-    /// 0.25 s on an M-series Mac, which is why `RawInput.open` remembers the answer per
-    /// camera and mode instead of asking for every file.
+    /// has to be decompressed up to that region, so this is not free: in a fresh process
+    /// it adds 0.1 to 0.7 s on an M-series Mac, which is why `RawInput.open` remembers the
+    /// answer per camera and mode instead of asking for every file.
     static func canDecode(_ url: URL) -> Bool {
         guard let filter = CIRAWFilter(imageURL: url),
               let image = filter.outputImage, !image.extent.isEmpty, !image.extent.isInfinite

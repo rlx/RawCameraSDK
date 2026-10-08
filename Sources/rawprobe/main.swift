@@ -55,8 +55,7 @@ do {
     case ("one", 1):
         FileHandle.standardOutput.write(try JSONEncoder().encode(Probe.measure(fileURL(operands[0]))))
     case ("bench-one", 2):
-        let routing: RawDecodeOptions.Routing = operands[0] == "apple" ? .apple : .fallback
-        FileHandle.standardOutput.write(try JSONEncoder().encode(Bench.measure(fileURL(operands[1]), routing: routing)))
+        FileHandle.standardOutput.write(try JSONEncoder().encode(Bench.measure(fileURL(operands[1]), route: operands[0])))
     case ("compare", 2):
         try Compare.run(input: fileURL(operands[0]), output: fileURL(operands[1]))
     case ("fuzz-one", 1):

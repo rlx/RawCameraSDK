@@ -22,23 +22,21 @@ Fallback decode time, median: 0.21 s on the Metal path (784 files), 1.41 s on th
 | Fujifilm RAF | 12 | Fujifilm DBP for GX680, Fujifilm HS30EXR, Fujifilm HS33EXR, Fujifilm S100FS, Fujifilm S200EXR, Fujifilm S5000 and 6 more |
 | Sigma X3F | 11 | Sigma DP1, Sigma DP1 Merrill, Sigma DP2 Merrill, Sigma DP3 Merrill, Sigma SD1 Merrill, Sigma SD14 and 5 more |
 | Phase One IIQ | 9 | Phase One H 25, Phase One IQ180, Phase One IQ3 100MP, Phase One P20+, Phase One P25+, Phase One P40+ and 3 more |
-| Olympus ORF | 7 | Olympus C5060WZ, Olympus E-10, Olympus E-M10MarkIIIS, Olympus SP510UZ, Olympus SP550UZ, Olympus SP565UZ and 1 more |
+| Olympus / OM ORF | 7 | Olympus C5060WZ, Olympus E-10, Olympus E-M10MarkIIIS, Olympus SP510UZ, Olympus SP550UZ, Olympus SP565UZ and 1 more |
 | Canon CR2 | 4 | Canon PowerShot S100V, Canon PowerShot SX110 IS, Canon PowerShot SX30 IS, Canon PowerShot SX40 HS |
 | Kodak DCR | 4 | Kodak DCS Pro 14N, Kodak DCS Pro 14nx, Kodak DCS Pro SLR/c, Kodak DCS760C |
 | Kodak KDC | 4 | Kodak EasyShare Z981, Kodak EasyShare Z990, Kodak P712 ZOOM, Kodak P880 ZOOM |
+| GitUp RAW | 3 | GITUP GIT2 16:9, GITUP GIT2P 16:9, Samsung WB550 |
 | Nikon NEF | 3 | Nikon COOLSCAN IV ED, Nikon COOLSCAN V ED, Nikon E5700 |
-| GITUP RAW | 2 | GITUP GIT2 16:9, GITUP GIT2P 16:9 |
 | Panasonic RW2 | 2 | Panasonic DC-FZ45, Panasonic DMC-FX150 |
+| SJCAM RAW | 2 | GITUP GIT2 16:9, Kodak 12MP |
 | DJI DNG | 1 | DJI Osmo Action |
-| Gitup RAW | 1 | Samsung WB550 |
 | Leaf IIQ | 1 | Leaf Credo 40 |
 | Leaf MOS | 1 | Leaf Aptus 22 |
 | Minolta MDC | 1 | Minolta RD175 |
 | Minolta MRW | 1 | Minolta DiMAGE 5 |
 | Panasonic RAW | 1 | Panasonic DMC-FZ8 |
 | Pentax PEF | 1 | Pentax K-3 Mark III Monochrome |
-| SJCAM RAW | 1 | GITUP GIT2 16:9 |
-| SJCam RAW | 1 | Kodak 12MP |
 | Sinarback STI | 1 | Sinarback eVolution 75, Sinar p3 / f3 |
 | Sony ARW | 1 | Sony DSC-RX1RM3 |
 | Xiaomi DNG | 1 | Xiaomi HM NOTE 1LTE |

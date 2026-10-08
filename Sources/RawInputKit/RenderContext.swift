@@ -1,7 +1,8 @@
 import CoreImage
 
 /// The Core Image context RawInputKit uses for its own small renders: the Apple-support
-/// probe and preview rotation. It is not used for the caller's rendering.
+/// probe, preview rotation, the exposure measurement and the colour check against the
+/// embedded preview. It is not used for the caller's rendering.
 ///
 /// One shared context, because creating one is expensive and `CIContext` is thread-safe.
 /// Intermediates are not cached: every render here is a one-off, and the cache would only

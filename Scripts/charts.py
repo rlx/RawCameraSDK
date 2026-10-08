@@ -15,6 +15,8 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
+from brands import brand
+
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "Docs"
 
@@ -27,9 +29,6 @@ THEMES = {
 FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 BAR = 16  # bar thickness, px
 GAP = 2   # surface gap between stacked segments, px
-
-# Brands whose files appear under more than one maker name in the archive.
-MAKERS = {"OM System": "Olympus / OM", "Olympus": "Olympus / OM", "OM Digital Solutions": "Olympus / OM"}
 
 
 class Svg:
@@ -83,9 +82,8 @@ def coverage(rows, pool):
     """Stacked bars per brand: what Apple opens, what only the fallback adds, what nothing opens."""
     counts = defaultdict(lambda: {"apple": 0, "fallback": 0, "neither": 0})
     for row in rows:
-        maker = pool[row["file"]]["make"]
         outcome = "apple" if row["apple"] else "fallback" if row["fallback"] else "neither"
-        counts[MAKERS.get(maker, maker)][outcome] += 1
+        counts[brand(pool[row["file"]]["make"])][outcome] += 1
     ranked = sorted(counts.items(), key=lambda item: -sum(item[1].values()))
     shown, rest = ranked[:12], ranked[12:]
     other = {key: sum(c[key] for _, c in rest) for key in ("apple", "fallback", "neither")}

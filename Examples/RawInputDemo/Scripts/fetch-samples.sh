@@ -3,11 +3,11 @@
 # checks each against its SHA-256.
 #
 # Runs as an Xcode build phase and by hand before `swift test`. The files are not in the
-# repository: they total 270 MB, and raw.pixls.us, where they are published under CC0, is
+# repository: they total 285 MB, and raw.pixls.us, where they are published under CC0, is
 # the source of truth.
 #
 # Verification is remembered in Samples/files/.verified, so a build after the first one
-# costs a file-timestamp comparison instead of hashing 270 MB.
+# costs a file-timestamp comparison instead of hashing 285 MB.
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p Samples/files

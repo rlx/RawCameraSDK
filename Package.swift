@@ -25,6 +25,8 @@ let package = Package(
                 "src/postprocessing/postprocessing_ph.cpp",
                 "src/preprocessing/preprocessing_ph.cpp",
                 "src/write/write_ph.cpp",
+                // Not a source file; named so SwiftPM does not warn that it has no rule for it.
+                "src/Makefile",
             ],
             sources: ["src"],
             publicHeadersPath: "libraw",

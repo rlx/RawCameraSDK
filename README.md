@@ -4,19 +4,19 @@
 
 One call that opens a camera RAW file on iOS and macOS. Apple's decoder handles the file
 when it can; when it can't, LibRaw decodes it and a Metal kernel develops it. Either way the
-caller gets a linear `CIImage` ready for an editor, and one rendering step turns it into the
-same picture whichever decoder ran.
+caller gets a linear `CIImage` ready for an editor, and one rendering step turns
+scene-linear data from either decoder into the same kind of picture.
 
 **In five lines**
 
-1. Apple's decoder opens 87% of 944 test files, including every current mainstream camera
-   tested. Plain RAW support is not worth building.
+1. Apple's decoder opens 87% of 944 test files, including nearly every recent mainstream
+   camera in the set. For those, writing a decoder is not worth it: use Apple's.
 2. A fallback on LibRaw and Metal opens most of the rest: 98% together.
-3. One shared rendering step makes the two decoders' pictures match: their colour
-   difference drops from ΔE 10.7 to 3.2.
-4. On an iPhone 16 Pro Max the fallback is faster than Apple's decoder on ordinary sensors.
-   It checks its own colours against the camera's preview, and it survived 800 deliberately
-   damaged files without a crash.
+3. One shared rendering step brings the two decoders' pictures together: their colour
+   difference drops from a median ΔE of 10.7 to 3.2.
+4. On an iPhone 16 Pro Max the fallback is as fast as Apple's decoder or faster on ordinary
+   sensors up to 50 MP, and much slower on Fujifilm X-Trans. It checks its own colours
+   against the camera's preview, and 800 deliberately damaged files did not crash it.
 5. What I would do with all this is one page: [Docs/RECOMMENDATION.md](Docs/RECOMMENDATION.md).
 
 ```swift
@@ -26,14 +26,23 @@ let raw = try RawInput.open(url)          // CIImage: linear light, rotated upri
 raw.route                                 // .apple or .fallback
 raw.decoder                               // "Apple RAW 8", "LibRaw 0.22.2 + Metal"
 let thumbnail = try RawInput.preview(url) // the camera's embedded JPEG; no sensor decode
-let picture = raw.rendered(look: .film)   // the same look from either decoder
+```
+
+By default Apple's decoder returns its own finished rendering. To get the same look from
+either decoder, ask for scene-linear data and render it yourself:
+
+```swift
+var options = RawDecodeOptions()
+options.appleRendering = .linear          // scene-linear from Apple's decoder too
+let raw = try RawInput.open(url, options: options)
+let picture = raw.rendered(look: .film)   // one rendering step, whichever decoder ran
 ```
 
 ![A walkthrough of the demo app: one file through both decoders and both looks, then a file only the fallback opens](Docs/walkthrough.gif)
 
 | The gallery | The fallback develops a file Apple can't open | Apple's decoder, same file |
 |---|---|---|
-| ![Gallery of ten RAW files](Docs/gallery.png) | ![Sigma dp0 Quattro developed by the fallback](Docs/detail-fallback.png) | ![Apple's decoder cannot open the file](Docs/detail-apple.png) |
+| ![The demo's gallery of eleven RAW files](Docs/gallery.png) | ![Sigma dp0 Quattro developed by the fallback](Docs/detail-fallback.png) | ![Apple's decoder cannot open the file](Docs/detail-apple.png) |
 
 **Contents:** [Build and run](#build-and-run) · [Why](#why-this-for-vsco) ·
 [What Apple opens and what it doesn't](#what-apple-opens-and-what-it-doesnt) ·
@@ -86,12 +95,14 @@ works on the linear image. Import adds your own files from Files or a card reade
 
 ```sh
 Examples/RawInputDemo/Scripts/fetch-samples.sh        # the demo's eleven files, 285 MB
-Scripts/corpus.py fetch --only DMC-LX10               # one more, for the crop test, 20 MB
+Scripts/corpus.py fetch --only DMC-LX10_-_1_1         # one more, for the crop test, 22 MB
 swift test
 ```
 
-44 tests in 8 suites. Without the downloads, the suites that need files are skipped and the
-rest still run. CI runs them on every push. On the iPhone simulator:
+44 tests in 8 suites. Without the downloads, the suites that need files are skipped, with
+the command that fetches them, and the rest still run. CI runs them on pushes to `main` and
+on pull requests, with the sample files but without the crop-test file. On the iPhone
+simulator:
 
 ```sh
 xcodebuild test -scheme RawInputKit-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
@@ -106,8 +117,9 @@ code of the Apple developer team that signs the build; a free personal team work
 # The same 44 tests, on the device.
 Scripts/device-tests.sh <device-udid> <team-id>
 
-# Timings and peak memory. 15 app launches by default;
-# the second form is the full set behind the tables below, 102 launches.
+# Timings and peak memory. 15 app launches by default, one per measurement, which is
+# what the comparison table below comes from; the second form measures everything
+# three times, 102 launches.
 Scripts/device-bench.py <device-udid>
 Scripts/device-bench.py <device-udid> --limit 0 --runs 3
 ```
@@ -166,7 +178,9 @@ project is that stage, built to answer three questions with measurements:
 
 `rawprobe` ran both decoders over **944 files from 898 camera models**, all CC0 samples from
 [raw.pixls.us](https://raw.pixls.us): one file for every camera in the archive, plus extra
-compression modes for current bodies. Measured on macOS 27.0.1, Apple silicon. Apple
+compression modes for current bodies. Every file counts once, so a 2003 compact weighs the
+same as this year's flagship: this is coverage of formats, not of what photographers shoot
+today. Measured on macOS 27.0.1, Apple silicon. Apple
 publishes a single camera list for iOS, iPadOS and macOS 27, and the ten bundled samples
 were re-checked on an iPhone 16 Pro Max running iOS 27.0.1: Apple's decoder rejects all ten
 there as well.
@@ -192,38 +206,42 @@ Of the 821 that Apple opens, the fallback also opens 807.
 | Sony | 109 | 108 | 99% | 1 | 0 |
 | Nikon | 95 | 92 | 97% | 3 | 0 |
 | Fujifilm | 89 | 77 | 87% | 12 | 0 |
-| Olympus / OM | 70 | 63 | 90% | 7 | 0 |
+| Olympus / OM | 72 | 65 | 90% | 7 | 0 |
 | Samsung | 42 | 25 | 60% | 17 | 0 |
 | Pentax | 36 | 35 | 97% | 1 | 0 |
 | Leica | 23 | 23 | 100% | 0 | 0 |
 | Huawei | 17 | 17 | 100% | 0 | 0 |
 | Phase One | 14 | 5 | 36% | 9 | 0 |
 | Sigma | 13 | 2 | 15% | 11 | 0 |
-| 51 other brands | 140 | 105 | 75% | 21 | 14 |
+| 42 other brands | 138 | 103 | 75% | 21 | 14 |
 
 The complete lists, file by file, are in [Docs/coverage.md](Docs/coverage.md).
 
 **Apple covers current cameras better than its reputation.** Forum posts and older articles
-report gaps in Fujifilm compressed RAF, Nikon High Efficiency, Sony a7 V compressed and OM
-System High Res Shot. On OS 27, Apple opened every one of those in the test set. For
+report that it cannot open Nikon High Efficiency or Fujifilm compressed RAF. On OS 27 it
+opened all 4 High Efficiency files and 36 of the 37 compressed RAF files in the set. For
 mainstream bodies, RAW support is a few lines of `CIRAWFilter`.
 
-**What Apple does not open** falls into three groups:
+**What Apple does not open** (107 files the fallback does):
 
-- *Whole formats it never supported:* Sigma X3F (Foveon sensors), Samsung SRW (most of the NX
-  line), Kodak DCR and KDC, Canon compacts that write CRW.
-- *Particular modes of brands it does support:* Phase One Sensor+ IIQ, and a compressed file
-  from the Fujifilm X-E3.
+- *Formats it has almost never supported:* Sigma X3F from Foveon sensors (0 of 11 open),
+  Kodak KDC (0 of 4) and DCR (1 of 5), and Samsung SRW, most of the NX line (3 of 20).
+- *Particular modes of brands it does support:* most Phase One files in IIQ S and Sv2
+  compression (9 of 14 Phase One files fail), one compressed RAF from the Fujifilm X-E3,
+  and one of two reduced-size files from the Sony RX1R III, a 2025 camera.
 - *Individual bodies:* Pentax K-3 Mark III Monochrome (2023), Olympus E-M10 Mark IIIs,
   DJI Osmo Action, and older Fujifilm EXR and SuperCCD cameras.
+- *Raw dumps from hacked firmware:* 20 files from Canon compacts running CHDK, which write
+  plain sensor dumps Canon's own software never produced.
 
 **What the fallback does not open** that Apple does (14 files): Nikon High Efficiency, which
-uses a patented codec; JPEG XL and lossy-JPEG DNG; one Sony a7 V mode; two phone and
+uses a patented codec; JPEG XL and lossy-JPEG DNG; one Sony a7 V file; two phone and
 hobby-camera files; and five files where LibRaw reported corrupt data and RawInputKit refused
-to return a partly garbled image.
-Neither decoder is a superset of the other, which is why the order is Apple first.
+to return a partly garbled image. Neither decoder is a superset of the other, which is why
+the order is Apple first.
 
-**Neither opens** 16 files: GoPro GPR, and raw dumps from action cameras and a cinema camera.
+**Neither opens** 16 files: eight GoPro GPR files, two more CHDK dumps from Canon compacts,
+and six from action, dive and drone cameras, a digital film back and a cinema camera.
 
 ## Apple against the fallback: is there a difference?
 
@@ -264,8 +282,8 @@ Apple and 0.044 for the fallback. Both sit well under 0.15, where a result start
 wrong.
 
 The same comparison flags results worth a second look, above 0.15: 8 of Apple's 754 and 15
-of the fallback's 822. Seven files are flagged for both decoders, which points at an unusual
-preview more than at a bad decode. The clear fallback failures are cameras newer than
+of the fallback's 822. Seven files are flagged for both decoders, which points at the
+preview being the odd one out more than at a bad decode. The clear fallback failures are cameras newer than
 LibRaw's tables: it reads the Canon EOS R6 Mark III with the wrong black level and the
 picture comes out with a pink haze. LibRaw "supporting 1,274 cameras" is an upper bound, not
 a guarantee.
@@ -279,9 +297,11 @@ fallback in the first place.
 ### The GPU path is fast; the CPU path is not
 
 Time from file to a fully rendered, full-resolution image: open the file, then render every
-pixel to 8-bit sRGB, as an export would. Each figure is from a fresh process.
+pixel to 8-bit sRGB, as an export would. Each measurement is its own process. "Apple" is
+Apple's decoder on its own, called directly; RawInputKit's check of whether Apple can open a
+file is not in it and is covered separately below.
 
-**On an iPhone 16 Pro Max, iOS 27.0.1:**
+**On an iPhone 16 Pro Max, iOS 27.0.1** (one launch per figure):
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Docs/speed-device-dark.svg">
@@ -290,62 +310,71 @@ pixel to 8-bit sRGB, as an export would. Each figure is from a fresh process.
 
 | File | Fallback path | Apple | Fallback | Apple, next file | Fallback, next file | Apple peak memory | Fallback peak memory |
 |---|---|---|---|---|---|---|---|
-| Sony a9 III, 10 MP crop mode | GPU | 0.48 s | 0.18 s | 0.29 s | 0.12 s | 484 MB | 315 MB |
-| Canon EOS R3, 24 MP | GPU | 1.12 s | 0.40 s | 0.94 s | 0.32 s | 937 MB | 524 MB |
-| Nikon Z f, 24 MP | GPU | 0.63 s | 0.50 s | 0.45 s | 0.43 s | 543 MB | 529 MB |
-| Panasonic S1R II, 44 MP | GPU | 6.87 s | 0.70 s | 1.58 s | 0.66 s | 683 MB | 810 MB |
-| Sony a1, 50 MP | GPU | 1.18 s | 0.57 s | 0.95 s | 0.48 s | 712 MB | 910 MB |
-| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 1.43 s | 9.04 s | 1.23 s | 8.98 s | 726 MB | 1,258 MB |
-| Fujifilm GFX100 II, 102 MP | GPU, half size | 3.01 s | 3.05 s | 2.99 s | 2.97 s | 1,310 MB | 809 MB |
+| Sony a9 III, 10 MP crop mode | GPU | 0.44 s | 0.18 s | 0.24 s | 0.12 s | 483 MB | 315 MB |
+| Canon EOS R3, 24 MP | GPU | 1.45 s | 0.38 s | 0.72 s | 0.33 s | 907 MB | 525 MB |
+| Nikon Z f, 24 MP | GPU | 0.60 s | 0.50 s | 0.44 s | 0.41 s | 538 MB | 529 MB |
+| Panasonic S1R II, 44 MP | GPU | 6.36 s | 0.72 s | 1.05 s | 0.73 s | 679 MB | 811 MB |
+| Sony a1, 50 MP | GPU | 1.13 s | 0.61 s | 0.95 s | 0.58 s | 703 MB | 909 MB |
+| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 1.09 s | 9.87 s | 0.85 s | 9.89 s | 722 MB | 1,268 MB |
+| Fujifilm GFX100 II, 102 MP | GPU, half size | 2.21 s | 3.30 s | 2.00 s | 3.33 s | 1,306 MB | 810 MB |
 
 "Next file" is the same decode done a second time in the same process: what every file
 after the first costs once shaders and decoder state are warm.
 
-**On an Apple silicon Mac, macOS 27.0.1** (median of three):
+**On an Apple silicon Mac, macOS 27.0.1** (median of three launches):
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Docs/speed-dark.svg">
   <img src="Docs/speed-light.svg" alt="Seconds to a rendered image per file on a Mac, Apple's decoder against the fallback">
 </picture>
 
-| File | Fallback path | Apple | Fallback | Apple peak memory | Fallback peak memory |
-|---|---|---|---|---|---|
-| Sony a9 III, 10 MP crop mode | GPU | 0.48 s | 0.15 s | 1,285 MB | 375 MB |
-| Canon EOS R3, 24 MP | GPU | 0.88 s | 0.40 s | 2,161 MB | 688 MB |
-| Nikon Z f, 24 MP | GPU | 0.52 s | 0.45 s | 1,714 MB | 703 MB |
-| Panasonic S1R II, 44 MP | GPU | 1.82 s | 0.70 s | 3,681 MB | 1,393 MB |
-| Sony a1, 50 MP | GPU | 0.98 s | 0.49 s | 3,705 MB | 1,345 MB |
-| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 0.94 s | 10.93 s | 2,521 MB | 1,673 MB |
-| Fujifilm GFX100 II, 102 MP | GPU | 2.09 s | 3.67 s | 5,948 MB | 2,837 MB |
+| File | Fallback path | Apple | Apple via RawInputKit | Fallback | Apple peak memory | Fallback peak memory |
+|---|---|---|---|---|---|---|
+| Sony a9 III, 10 MP crop mode | GPU | 0.37 s | 0.47 s | 0.14 s | 1,279 MB | 376 MB |
+| Canon EOS R3, 24 MP | GPU | 0.60 s | 0.87 s | 0.40 s | 2,147 MB | 688 MB |
+| Nikon Z f, 24 MP | GPU | 0.43 s | 0.52 s | 0.45 s | 1,707 MB | 703 MB |
+| Panasonic S1R II, 44 MP | GPU | 1.15 s | 1.81 s | 0.69 s | 3,674 MB | 1,393 MB |
+| Sony a1, 50 MP | GPU | 0.88 s | 0.99 s | 0.49 s | 3,634 MB | 1,345 MB |
+| Fujifilm X-T5, 40 MP | CPU (X-Trans) | 0.67 s | 0.95 s | 10.91 s | 2,510 MB | 1,674 MB |
+| Fujifilm GFX100 II, 102 MP | GPU | 1.57 s | 2.12 s | 3.69 s | 6,040 MB | 2,837 MB |
+
+"Apple via RawInputKit" is the same file through `RawInput.open` with automatic routing in
+a fresh process, so it includes the check of whether Apple can open the file: 0.1 to 0.7 s
+here. That check is paid once per camera and recording mode, then remembered.
 
 What the numbers say:
 
-- **On Bayer files the fallback's GPU path is quicker than Apple's decoder** on both
-  machines, though Apple does more per pixel (noise reduction, lens correction, tone
-  mapping). The fallback's times include measuring exposure and checking its colours
-  against the embedded preview, about 0.05 s together.
-- **On X-Trans the fallback is six to twelve times slower.** It runs LibRaw's
+- **On Bayer files up to 50 MP the fallback's GPU path is as fast as Apple's decoder or
+  faster,** from a tie (Nikon Z f on the Mac) to about three times quicker. Apple does more per
+  pixel: noise reduction, lens correction, tone mapping. The fallback's times include
+  measuring exposure and checking its colours against the embedded preview.
+- **At 102 MP the fallback is slower,** and on the phone it produces a quarter of the pixels
+  (a half-size 25 MP image) while Apple renders all 102 MP. LibRaw's single-threaded
+  decompression of that format is most of the time.
+- **On X-Trans the fallback is nine to sixteen times slower.** It runs LibRaw's
   single-threaded CPU pipeline. Apple opens almost every X-Trans file, so this path is rare.
 - **The phone keeps up with the Mac on the fallback.** The work is one GPU pass and
   single-threaded decompression, and an iPhone's cores are as fast as a Mac's at that.
-- **Nothing was terminated for memory on the phone,** including the 102 MP frame. There the
-  fallback develops at half size (102 → 25 MP output), which is what keeps it at 809 MB.
-  Apple's decoder renders the full 102 MP in 1.3 GB.
+- **Nothing was terminated for memory on the phone,** including the 102 MP frame.
 - **Apple's decoder uses far more memory on the Mac** than on the phone for the same file:
   it scales its working set to the machine.
-- **Apple's decoder has a first-use cost per camera, and for one it is large.** The
-  Panasonic S1R II takes 6.9 s for the first decode in a process on the phone and 1.6 s for
-  the next one. The other cameras lose 0.2 s or less. The 5 s is one-off setup inside
-  Apple's engine for that camera; I could not see what it is doing. An app would want to
-  pay it off the main thread, before the user is waiting.
+- **Apple's decoder has a first-use cost per camera, and for one it is large.** The first
+  Panasonic S1R II decode in a process took 6.4 s on the phone and the next one 1.1 s; every
+  launch that measured it, seven across the day, showed the same. The time goes in setting the decoder up,
+  before any pixel is requested, and I could not see what it is doing. The other cameras
+  lose about 0.7 s or less. An app would want to pay this off the main thread, before the user is
+  waiting.
 
+The phone figures are single launches, so differences of a tenth of a second between two
+rows mean little; the Canon EOS R3's first Apple decode measured 1.1 s in an earlier run.
 Peak memory includes the benchmark's own output buffer, 4 bytes per pixel.
 
-The ten samples Apple's decoder rejects, on the same iPhone, through the fallback:
+The ten samples Apple's decoder rejects, on the same iPhone, through the fallback (median of
+three launches, except the first row):
 
 | Sample | Path | Embedded preview | File to rendered image | Peak memory |
 |---|---|---|---|---|
-| Samsung NX1, 28 MP | GPU | 56 ms | 0.51 s | 551 MB |
+| Samsung NX1, 28 MP | GPU | 53 ms | 0.66 s | 582 MB |
 | Samsung NX300, 20 MP | GPU | 44 ms | 0.37 s | 436 MB |
 | Fujifilm X-E3, 24 MP | CPU | 26 ms | 5.15 s | 697 MB |
 | Olympus E-M10 Mark IIIs, 12 MP | GPU | 30 ms | 0.39 s | 281 MB |
@@ -356,10 +385,11 @@ The ten samples Apple's decoder rejects, on the same iPhone, through the fallbac
 | Canon PowerShot S100V, 12 MP | GPU | 29 ms | 0.30 s | 271 MB |
 | DJI Osmo Action, 12 MP | GPU | 28 ms | 0.14 s | 266 MB |
 
-This table was measured before the fallback gained its colour check, which adds 0.05 to
-0.1 s; the Samsung NX1, measured again since, takes 0.63 s.
+Only the first row was measured after the fallback gained its exposure measurement and
+colour check; the other nine predate them and would each be 0.04 to 0.15 s slower now (the
+Samsung NX1 went from 0.51 s to 0.66 s).
 
-The embedded preview takes 24 to 74 ms across every file measured on the phone, which is
+The embedded preview takes 24 to 79 ms across every file measured on the phone, which is
 what makes a gallery usable before anything is developed.
 
 ### Summary
@@ -368,11 +398,11 @@ what makes a gallery usable before anything is developed.
 |---|---|---|
 | Files opened, of 944 | 821 | 914 |
 | Look, out of the decoder | Finished: tone curve, sharpening, lens corrections | Scene-linear and flat |
-| Look, after the shared rendering | The same picture, to a median ΔE of 3 | The same picture |
+| Look, after the shared rendering | Close: a median colour difference of ΔE 3 between the two | |
 | Colour distance from the camera's preview, median | 0.027 | 0.044 |
 | Results flagged against the camera's preview | 8 of 754 | 15 of 822 |
-| Speed on Bayer files up to 50 MP, iPhone 16 Pro Max | 0.5 to 1.2 s, 6.9 s for one camera's first decode | 0.2 to 0.7 s |
-| Speed on X-Trans, 40 MP, iPhone 16 Pro Max | 1.4 s | 9.0 s |
+| Speed on Bayer files up to 50 MP, iPhone 16 Pro Max | 0.4 to 1.5 s, 6.4 s for one camera's first decode | 0.2 to 0.7 s |
+| Speed on X-Trans, 40 MP, iPhone 16 Pro Max | 1.1 s | 9.9 s |
 | New cameras | Arrive with OS updates | Arrive with LibRaw releases, and can decode wrongly before then |
 | Cost to ship | None | LibRaw under CDDL, about 1 MB of code, a look to build |
 
@@ -406,23 +436,25 @@ between the two routes' pictures:
   <img src="Docs/route-match-light.svg" alt="Colour difference between the two decoders: median ΔE 10.7 for their own outputs, 3.2 after a shared neutral look, 2.9 after a shared film look">
 </picture>
 
-ΔE is the usual measure of how different two colours look: about 1 is the smallest
-difference visible side by side, and above 10 the colours are plainly different. Out of
-the decoders the two routes differ by a median of 10.7. Through the shared look that falls
-to 3.2 (neutral) and 2.9 (film), and the routes come closer on 193 of the 202 files.
+ΔE is the usual measure of how different two colours look (CIELAB, 1976 formula): about 1 is
+the smallest difference visible side by side, and above 10 the colours are plainly
+different. Here it is the mean over a 24 by 16 grid of area averages, so it measures colour
+and tone across the frame and is blind to sharpness, noise and local distortion. Out of the
+decoders the two routes differ by a median of 10.7. Through the shared look that falls to
+3.2 (neutral) and 2.9 (film), and the routes come closer on 193 of the 202 files.
 
-It is not zero, and it should not be oversold. A difference of 3 is visible if you flip
-between the two. What remains is real: the decoders use different colour matrices, and
-Apple applies lens corrections and noise reduction that the fallback does not. Those are the
-next things to build if the routes must be indistinguishable. The looks themselves are a
-contrast curve, saturation, two tints and a fade; a product would put its own presets here.
+A difference of 3 is still visible if you flip between the two. What remains is real: the
+decoders use different colour matrices, and Apple applies lens corrections and noise
+reduction that the fallback does not. Those are the next things to build if the routes must
+be indistinguishable. The looks themselves are a contrast curve, saturation, two tints and a
+fade; a product would put its own presets here.
 
 ## How it works
 
 ```
 RawInput.open(url)
    │
-   ├─ Can Apple develop it?  Decode a 256 px version and see whether pixels come out.
+   ├─ Can Apple develop it?  Render a small region and see whether pixels come out.
    │
    ├─ yes ─ CIRAWFilter ──────────────────────────────────┐
    │                                                      ├─▶ RawImage: linear CIImage, info, route
@@ -441,9 +473,11 @@ RawInput.open(url)
   float. The better-known demosaic algorithms are GPL and are not used.
 - **Everything else uses LibRaw's own pipeline:** X-Trans, Foveon, monochrome sensors, and
   Phase One backs, which need per-sensor corrections only LibRaw applies.
-- **In-camera crops are honoured,** so a file shot at 1:1 comes out square on both routes.
-- **Malformed files are refused, not developed.** Sizes and levels are validated before they
-  reach the GPU, and truncated data is an error instead of a half-garbled image.
+- **In-camera crops are honoured** on Bayer and full-colour sensors, so a file shot at 1:1
+  comes out square on both routes. X-Trans files are left at the full frame.
+- **Malformed files are validated, not trusted.** Sizes, margins and levels are checked
+  before they reach the GPU, and data that LibRaw reports as corrupt is an error instead of
+  a half-garbled image.
 - **Rendering comes after decoding, once.** Neither decoder decides the look. Exposure is
   measured from the pixels by the same function for both routes, and a `RawLook` turns the
   linear data into a picture.
@@ -471,12 +505,12 @@ a test asserts both, on the Mac, the simulator and the phone.
 | Panasonic DC-FZ45 | RW2, 18 MP | GPU |
 | Sigma dp0 Quattro | X3F, Foveon, 20 MP | CPU |
 | Pentax K-3 Mark III Monochrome | PEF, monochrome sensor, 26 MP | CPU |
-| Phase One IQ180 | IIQ Sensor+, 20 MP | CPU |
+| Phase One IQ180 | IIQ Sv2, 20 MP | CPU |
 | Canon PowerShot S100V | CR2, 12 MP | GPU |
 | DJI Osmo Action | DNG, 12 MP | GPU |
 
-These are what the measurements turned up, not the cameras people buy today: the current
-best-sellers all open in Apple's decoder.
+These are what the measurements turned up, not the cameras people buy today: nearly all
+recent mainstream bodies in the set open in Apple's decoder.
 
 ## Limits
 
@@ -486,19 +520,24 @@ best-sellers all open in Apple's decoder.
 - **The looks are deliberately simple:** a curve, saturation, tints and a fade.
 - **X-Trans and Foveon are slow,** seconds per frame on one CPU core.
 - **The colour check needs an embedded preview** and reports, it does not refuse. A file
-  without a preview is not checked, and about one correct decode in a hundred is flagged
-  because the camera's picture style was vivid.
+  without a preview is not checked, and about one decode in a hundred is flagged although
+  both decoders agree with each other, because the preview itself is the odd one out.
+- **Truncated files are not always caught.** LibRaw reports corrupt data for compressed
+  formats, and those are refused. For uncompressed ones it reads what is there and leaves
+  the rest of the frame empty, and the fallback returns that image without complaint.
 - **Fuzzing is shallow.** 800 seeded, damaged copies of eight real files produced no crash
   and no hang. That exercises this project's handling of sizes and levels; it is not
   coverage-guided fuzzing of LibRaw.
-- **Large frames are halved.** Above 64 MP the fallback develops Bayer files at half size to
-  stay within an iPhone's memory. Other sensor types are not reduced.
+- **Large frames are halved.** Above 64 MP the fallback develops mosaic sensors (Bayer and
+  X-Trans) at half size to stay within a smaller phone's memory. Foveon, monochrome and
+  already-demosaiced files are not reduced.
 - **Measured on one phone,** an iPhone 16 Pro Max with 8 GB of memory. Older phones with
   less memory are where the 64 MP half-size threshold will matter, and they are untested.
 - **RAW 9,** Apple's newer decoder, is offered on the test machine for DNG only. The
   `appleDecoderVersion = .newest` option selects it; nothing else here exercises it.
 - LibRaw's sources compile with deprecation warnings that SwiftPM offers no safe way to
   silence. RawInputKit's own code compiles without warnings.
+- **Requires Xcode 27.** It has not been built with older toolchains.
 
 ## Licence
 

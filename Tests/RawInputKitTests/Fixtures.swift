@@ -7,7 +7,7 @@ import Testing
 /// (raw.pixls.us, CC0) is the source of truth. Fetch them once:
 ///
 ///     Examples/RawInputDemo/Scripts/fetch-samples.sh    the demo's eleven files, 285 MB
-///     Scripts/corpus.py fetch --only DMC-LX10           one more, for the crop test, 20 MB
+///     Scripts/corpus.py fetch --only DMC-LX10_-_1_1     one more, for the crop test, 22 MB
 ///
 /// Suites that need a file that is missing are skipped, with a message saying which
 /// command fetches it.
@@ -57,7 +57,7 @@ enum Fixtures {
     /// only metadata says the picture is square.
     static let cropped = corpusFile(named: "DMC-LX10_-_1_1") ?? document("cropped.rw2")
 
-    static let fetchHint: Comment = "run fetch-samples.sh, and Scripts/corpus.py fetch --only DMC-LX10"
+    static let fetchHint: Comment = "run fetch-samples.sh, and Scripts/corpus.py fetch --only DMC-LX10_-_1_1"
 
     private static var corpus: URL { root.appending(path: "Tests/Corpus") }
 
