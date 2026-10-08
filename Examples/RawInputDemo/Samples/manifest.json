@@ -1,0 +1,92 @@
+[
+ {
+  "file": "samsung-nx1.srw",
+  "camera": "Samsung NX1",
+  "format": "SRW · 28 MP",
+  "url": "https://raw.pixls.us/getfile.php/837/nice/Samsung - NX1 - 14bit (3:2).srw",
+  "sha256": "ec57f83c23094766b723ba9446cdf79388c527934d6689c1ac5b1b6ab3ea8378",
+  "megabytes": 35.19,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "samsung-nx300.srw",
+  "camera": "Samsung NX300",
+  "format": "SRW · 20 MP",
+  "url": "https://raw.pixls.us/getfile.php/1832/nice/Samsung - NX300 - 12bit (3:2).SRW",
+  "sha256": "2087d4b351134e307c1c5e7a4fbf5691998a4c7b20451ba46f8f577d87b38052",
+  "megabytes": 21.78,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "fujifilm-x-e3.raf",
+  "camera": "Fujifilm X-E3",
+  "format": "RAF compressed · X-Trans · 24 MP",
+  "url": "https://raw.pixls.us/getfile.php/1865/nice/Fujifilm - X-E3 - 14bit 14bit compressed (3:2).RAF",
+  "sha256": "03d6e79ae79107c51d0e1c1c9e488a0ab20268cd9fe43f47d8ea3ea310df35c6",
+  "megabytes": 26.51,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "olympus-e-m10markiiis.orf",
+  "camera": "Olympus E-M10 Mark IIIs",
+  "format": "ORF, 16:9 in-camera crop · 12 MP",
+  "url": "https://raw.pixls.us/getfile.php/4927/nice/Olympus - E-M10 Mark IIIs - 16bit (4:3).ORF",
+  "sha256": "8bc0009eaacdbeacc72606581665702a1242bc6d4b405d1f0b3f149fe6c85e55",
+  "megabytes": 15.83,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "panasonic-dc-fz45.rw2",
+  "camera": "Panasonic DC-FZ45",
+  "format": "RW2 · 18 MP",
+  "url": "https://raw.pixls.us/getfile.php/2580/nice/Panasonic - DC-FZ45 - 4:3.RW2",
+  "sha256": "30c02f392d1d0dfba93cff429172b768225f11da2ce6a6b40a195611d8486954",
+  "megabytes": 20.92,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "sigma-dp0-quattro.x3f",
+  "camera": "Sigma dp0 Quattro",
+  "format": "X3F · Foveon · 20 MP",
+  "url": "https://raw.pixls.us/getfile.php/1111/nice/Sigma - DP0 Quattro.X3F",
+  "sha256": "9e3095dd20237d35117faaaf1c66e22d0c271ab931f60775b3538519b49f54aa",
+  "megabytes": 54.55,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "pentax-k-3-mark-iii-monochrome.pef",
+  "camera": "Pentax K-3 Mark III Monochrome",
+  "format": "PEF · monochrome sensor · 26 MP",
+  "url": "https://raw.pixls.us/getfile.php/7082/nice/Pentax - K-3 Mark III Monochrome - 14bit (3:2).PEF",
+  "sha256": "2d47df9825d1f0fa14321b589f2934678b19dcb28d74210b86bf8a0efc7d514a",
+  "megabytes": 35.71,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "phase-one-iq180.iiq",
+  "camera": "Phase One IQ180",
+  "format": "IIQ Sensor+ · 20 MP",
+  "url": "https://raw.pixls.us/getfile.php/6395/nice/Phase One - IQ180 - IIQ Sv2 (4:3).IIQ",
+  "sha256": "ee0222aeb29e38cb4a664f0993cb4b109f31dc592c469df12a7d7a3f522f6165",
+  "megabytes": 20.89,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "canon-powershot-s100v.cr2",
+  "camera": "Canon PowerShot S100V",
+  "format": "CR2 · 12 MP",
+  "url": "https://raw.pixls.us/getfile.php/2492/nice/Canon - PowerShot S100V - RAW (4:3).CR2",
+  "sha256": "4775f347686f785104ee7f566df158247cdecef4de76fdbfa150e18b6b104c0a",
+  "megabytes": 15.27,
+  "license": "CC0-1.0"
+ },
+ {
+  "file": "dji-osmo-action.dng",
+  "camera": "DJI Osmo Action",
+  "format": "DNG · 12 MP",
+  "url": "https://raw.pixls.us/getfile.php/3214/nice/DJI - DJI Osmo Action - 16bit (4:3).DNG",
+  "sha256": "c05a4b112936c9ac110af241ca9e1bda089f7456b647f8a13595b604cbdf944c",
+  "megabytes": 23.55,
+  "license": "CC0-1.0"
+ }
+]

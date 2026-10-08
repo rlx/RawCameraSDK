@@ -1,0 +1,3 @@
+[submodule "Vendor/LibRaw"]
+	path = Vendor/LibRaw
+	url = https://github.com/LibRaw/LibRaw.git

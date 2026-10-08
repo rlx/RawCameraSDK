@@ -1,0 +1,7 @@
+.build/
+Tests/Corpus/
+.DS_Store
+*.xcuserstate
+xcuserdata/
+Examples/RawInputDemo/Samples/files/
+.swiftpm/

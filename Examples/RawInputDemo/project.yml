@@ -1,0 +1,82 @@
+# Generates RawInputDemo.xcodeproj: `xcodegen generate` in this folder.
+name: RawInputDemo
+options:
+  bundleIdPrefix: dev.rawinputkit
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+packages:
+  RawInputKit:
+    path: ../..
+targets:
+  RawInputDemo:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - App
+      - path: Samples/manifest.json
+        buildPhase: resources
+      - path: Samples/files
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: RawInputKit
+    preBuildScripts:
+      - name: Fetch sample RAW files
+        script: '"$SRCROOT/Scripts/fetch-samples.sh"'
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        PRODUCT_NAME: RawInputDemo
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rawinputkit.demo
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: RAW Input
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
+        # Lets Finder and `devicectl` put extra RAW files in the app's Documents folder.
+        INFOPLIST_KEY_UIFileSharingEnabled: YES
+        INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
+        # The sample fetch downloads into the source folder.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        CODE_SIGN_STYLE: Automatic
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+        ENABLE_HARDENED_RUNTIME: YES
+  # The package's own test suite, hosted in the app so it can run on a physical device.
+  # `swift test` and the package scheme cover the Mac and the simulator; a device will only
+  # run tests that live inside an app. Same source files, no copies.
+  RawInputDemoTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: ../../Tests/RawInputKitTests
+    dependencies:
+      - target: RawInputDemo
+      - package: RawInputKit
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rawinputkit.demo.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/RawInputDemo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RawInputDemo"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+schemes:
+  RawInputDemo:
+    build:
+      targets:
+        RawInputDemo: all
+        RawInputDemoTests: [test]
+    test:
+      config: Debug
+      targets:
+        - RawInputDemoTests
+    run:
+      # Release, because the fallback's CPU paths (X-Trans, Foveon) are many times
+      # slower when LibRaw is built without optimisation.
+      config: Release
