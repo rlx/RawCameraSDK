@@ -2,59 +2,61 @@
 
 [![CI](https://github.com/rlx/RawCameraSDK/actions/workflows/ci.yml/badge.svg)](https://github.com/rlx/RawCameraSDK/actions/workflows/ci.yml)
 
-A work sample. I took one problem, getting camera RAW files into an editor, and tried to
-answer it with measurements instead of assumptions: how much does Apple's system decoder
-already solve, what is left, and what does it cost to cover the rest?
+RawInputKit opens camera RAW files on iOS and macOS. It uses Apple's system decoder when
+that can develop the file and falls back to LibRaw when it can't. The decoder core also
+builds as a Rust crate and as WebAssembly.
 
-It was written with VSCO's Studio Pro in mind. Studio Pro does not import RAW yet, while
-VSCO's main app already edits RAW on iOS, so decoding is not the open question
-there. What I looked at is the part around the decoder: which files it turns away, how a
-second decoder can sit behind it without changing how pictures look, and how the result
-reaches an engine that is not built on Core Image. My recommendation is one page:
-[Docs/RECOMMENDATION.md](Docs/RECOMMENDATION.md).
+This is a work sample. I wanted to know how much of RAW support Apple's decoder already
+covers, what it leaves out, and what it takes to cover that. I had VSCO's Studio Pro in
+mind while building it. Studio Pro does not import RAW yet, although VSCO's main app
+already edits RAW on iOS, so I looked at the work around the decoder more than at decoding:
+which files Apple turns away, how a second decoder can sit behind it and still produce
+matching pictures, and how the data gets to an engine that isn't built on Core Image.
+[Docs/RECOMMENDATION.md](Docs/RECOMMENDATION.md) is what I would propose from that.
 
-## What I found
+## Findings
 
-1. Apple's decoder opens 87% of 944 test files, and 93% of those shot since 2019. For most
-   cameras, the right decoder is the one already on the device.
-2. A fallback built on LibRaw and a Metal kernel opens most of the rest: 98% together.
-   What it adds is mostly old or niche: Sigma Foveon, Samsung NX, some Phase One modes.
-3. The two decoders' pictures look different by default. Taking scene-linear data from both
-   and measuring exposure the same way brings them to a median colour difference of ΔE 3.
-4. On an iPhone 16 Pro Max the fallback is as fast as Apple's decoder or faster on Bayer
-   sensors up to 50 MP, and six to eight times slower on Fujifilm X-Trans.
-5. The fallback is sometimes wrong without knowing it. It now checks each result against
-   the camera's embedded preview and flags the ones that disagree: 15 of 822.
+1. Apple's decoder opens 87% of 944 test files, and 93% of the ones shot since 2019.
+2. With a fallback on LibRaw and a Metal kernel the total is 98%. Most of what the
+   fallback adds is old or niche, such as Sigma Foveon, Samsung NX and some Phase One modes.
+3. By default the two decoders produce different-looking pictures. If both are asked for
+   scene-linear data and exposure is measured the same way, the median colour difference
+   between them is about ΔE 3.
+4. On an iPhone 16 Pro Max the fallback is at least as fast as Apple's decoder on Bayer
+   sensors up to 50 MP. On Fujifilm X-Trans it is six to eight times slower.
+5. The fallback sometimes decodes a file with the wrong colours. It compares each result
+   with the camera's embedded preview and flagged 15 of 822.
 
-The numbers, charts and method are in [Docs/MEASUREMENTS.md](Docs/MEASUREMENTS.md).
+Numbers, charts and method are in [Docs/MEASUREMENTS.md](Docs/MEASUREMENTS.md).
 
 ![A walkthrough of the demo app: one file through both decoders and both looks, then a file only the fallback opens](Docs/walkthrough.gif)
 
-## What is here
+## Contents
 
-| Part | What it is |
+| Path | Contents |
 |---|---|
-| `Sources/RawInputKit` | The Swift library: one call that tries Apple's decoder and falls back to LibRaw |
-| `Sources/RawShim` | The portable core's C interface over LibRaw; no Apple APIs |
-| `Bindings/rust`, `Bindings/web` | The same core as a Rust crate (with the kernel in WGSL under wgpu) and as WebAssembly |
-| `Sources/rawprobe` | The measuring tools: coverage probe, benchmark, comparisons, fuzzing |
-| `Examples/RawInputDemo` | A SwiftUI app for iPhone and Mac, with eleven sample files |
-| `Docs` | Measurements, architecture, the recommendation, and how to build everything |
+| `Sources/RawInputKit` | The Swift library |
+| `Sources/RawShim` | C interface over LibRaw. Together they are the portable core, with no Apple APIs |
+| `Bindings/rust`, `Bindings/web` | The core as a Rust crate (kernel in WGSL, run through wgpu) and as WebAssembly |
+| `Sources/rawprobe` | Command-line tools for the measurements: coverage, benchmark, comparisons, fuzzing |
+| `Examples/RawInputDemo` | SwiftUI demo for iPhone and Mac with eleven sample files |
+| `Docs` | Measurements, architecture, recommendation, build instructions |
 
 ```swift
 import RawInputKit
 
-let raw = try RawInput.open(url, options: .sceneLinear)   // Apple's decoder, or the fallback
-raw.route                                                 // which one
-let picture = raw.rendered(look: .neutral)                // one rendering step for both
-let texture = try raw.makeTexture(device: device)         // or hand the data to a GPU engine
+let raw = try RawInput.open(url, options: .sceneLinear)   // Apple's decoder or the fallback
+raw.route                                                 // which one was used
+let picture = raw.rendered(look: .neutral)                // same rendering for both
+let texture = try raw.makeTexture(device: device)         // for an engine that works in Metal
 let thumbnail = try RawInput.preview(url)                 // the camera's embedded JPEG
 ```
 
 ## Coverage
 
-944 files from 898 camera models, all CC0 samples from [raw.pixls.us](https://raw.pixls.us).
-Every file counts once, so this is coverage of formats, not of what photographers shoot.
+The test set is 944 files from 898 camera models, all CC0 samples from
+[raw.pixls.us](https://raw.pixls.us). Each file counts once regardless of how common the
+camera is, so the percentages describe formats and don't reflect what people shoot today.
 
 | | Files | Share |
 |---|---|---|
@@ -67,8 +69,8 @@ Every file counts once, so this is coverage of formats, not of what photographer
   <img src="Docs/coverage-by-brand-light.svg" alt="Stacked bars per camera brand: files Apple's decoder opens, files only the fallback opens, files neither opens">
 </picture>
 
-Neither decoder is a superset of the other. Apple opens 14 files the fallback cannot,
-among them Nikon High Efficiency and JPEG XL DNG. That is why the order is Apple first.
+Apple also opens 14 files that the fallback cannot, including Nikon High Efficiency and
+JPEG XL DNG, so the library tries Apple first.
 
 ## How it works
 
@@ -85,19 +87,19 @@ RawInput.open(url)
               └─ everything else ─ LibRaw CPU pipeline ───┘
 ```
 
-- Routing is by trying, not by camera name. Support depends on the compression mode, and
-  `CIRAWFilter` can return an image that renders as nothing for a file it cannot develop.
-- Plain Bayer files are developed on the GPU: black level, white balance, Hamilton-Adams
-  demosaicing and the colour matrix in one kernel. It exists in Metal and in WGSL, and both
-  are checked against the same sixteen conformance cases.
-- Everything else goes through LibRaw's own pipeline: X-Trans, Foveon, monochrome sensors,
-  Phase One backs.
-- Sizes, margins and levels from the file are validated before they reach the GPU, there
-  is a memory limit, and a decode can be cancelled.
-- The library reports what it did: each file Apple turned away, each GPU failure, each
-  result whose colour it doubts.
+- Whether Apple supports a file depends on the compression mode as well as the camera, and
+  `CIRAWFilter` can return an image that renders empty for a file it can't develop. The
+  library checks by rendering a small region.
+- Plain Bayer files are developed on the GPU in one kernel: black level, white balance,
+  Hamilton-Adams demosaicing, colour matrix. The kernel is written in Metal and in WGSL,
+  and the same sixteen conformance cases run against both.
+- X-Trans, Foveon, monochrome sensors and Phase One backs go through LibRaw's own pipeline.
+- Sizes, margins and levels read from the file are validated before use. There is a memory
+  limit, and a decode can be cancelled.
+- An event handler receives the files Apple rejected, GPU failures and results with
+  suspect colour.
 
-[Docs/ARCHITECTURE.md](Docs/ARCHITECTURE.md) is the guide to the code.
+[Docs/ARCHITECTURE.md](Docs/ARCHITECTURE.md) describes the code.
 [Docs/PORTING.md](Docs/PORTING.md) covers the Rust and WebAssembly builds.
 
 ## Building
@@ -112,28 +114,29 @@ swift test
 open Examples/RawInputDemo/RawInputDemo.xcodeproj
 ```
 
-The demo, device testing, the Rust and WebAssembly builds, and how to regenerate every
-measurement are in [Docs/BUILDING.md](Docs/BUILDING.md).
+[Docs/BUILDING.md](Docs/BUILDING.md) has the rest: the demo, running on a device, the Rust
+and WebAssembly builds, and regenerating the measurements.
 
-## Limits
+## Limitations
 
-- The fallback has no lens correction, noise reduction or highlight recovery, and uses
-  LibRaw's colour matrices where Apple uses its own. After the shared rendering step the
-  two routes are close, not identical.
-- Its output is clipped to sRGB primaries, which discards gamut a RAW file has.
-- Default brightness is measured per picture. That is fine for viewing and wrong for a
-  bracketed series; a product would use a calibrated baseline per camera.
-- X-Trans and Foveon run on one CPU core and take seconds.
-- Above 64 MP the fallback develops mosaic sensors at half size to stay within a phone's memory.
-- Truncated files in uncompressed formats are not detected; they decode with empty rows.
-- The colour check needs an embedded preview and reports instead of refusing.
-- Measured on one phone, with 8 GB of memory. Smaller phones are untested.
-- The Rust and WebAssembly bindings decode and develop; they do not have the looks, the
-  colour check or cancellation. The WebAssembly build has been run under Node, not in a browser.
+- The fallback has no lens correction, noise reduction or highlight recovery, and it uses
+  LibRaw's colour matrices where Apple uses its own. With shared rendering the two decoders
+  come close but do not match exactly.
+- Fallback output is clipped to sRGB primaries, which loses some of the gamut in the file.
+- Default brightness is measured per picture. That works for viewing but would flatten a
+  bracketed series. A product would use a calibrated baseline per camera.
+- X-Trans and Foveon files run on a single CPU core and take seconds.
+- Above 64 MP the fallback develops mosaic sensors at half size to limit memory on phones.
+- A truncated file in an uncompressed format is not detected and decodes with empty rows.
+- The colour check needs an embedded preview. It reports a suspect result and still
+  returns the image.
+- Timings come from one phone with 8 GB of memory. Smaller phones are untested.
+- The Rust and WebAssembly bindings decode and develop but lack the looks, the colour check
+  and cancellation. The WebAssembly build was tested under Node and not in a browser.
 
 ## Licence
 
-RawInputKit is under the [MIT licence](LICENSE). It links LibRaw 0.22.2 under LibRaw's
-CDDL-1.0 option, unmodified, as a submodule; see
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The sample images are CC0 and are
-downloaded, not redistributed here.
+RawInputKit is released under the [MIT licence](LICENSE). It links LibRaw 0.22.2,
+unmodified, under LibRaw's CDDL-1.0 option. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The sample images are CC0. They are
+downloaded during the build and are not part of this repository.
