@@ -9,7 +9,7 @@ Measured with `rawprobe` on macOS 27.0.1 (arm64), over 944 CC0 files from raw.pi
 | Only Apple opens it | 14 |
 | Neither opens it | 16 |
 
-Fallback decode time, median: 0.21 s on the Metal path (784 files), 1.41 s on the CPU path (130 files).
+Fallback decode time, median: 0.22 s on the Metal path (784 files), 1.46 s on the CPU path (130 files).
 
 "Opens" means pixels came out. It does not mean the colour is right, so each fallback result is also compared with the camera's embedded preview: 15 of 822 files with a preview differ enough to be suspect (listed at the end).
 
