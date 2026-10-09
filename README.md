@@ -78,8 +78,8 @@ options.appleDecoderVersion = .pinned(edit.decoderVersion)
 
 `open` is also available as a blocking call. The `async` form decodes on a background
 queue and stops when its task is canceled. At most a few async decodes run at once and
-the rest wait in line, so importing a folder cannot exhaust memory: decoding as a whole is
-kept to a quarter of the device's memory (`RawInput.maximumConcurrentDecodes`,
+the rest wait in line, so importing a folder is bounded: the fallback's decoding is kept
+to an estimated quarter of the device's memory (`RawInput.maximumConcurrentDecodes`,
 `RawDecodeOptions.fallbackMemoryLimitMB`).
 
 ## Coverage
@@ -173,9 +173,7 @@ and WebAssembly builds, and regenerating the measurements.
 - X-Trans and Foveon files run on a single CPU core and take seconds.
 - Above 64 MP the fallback develops mosaic sensors at half size to limit memory on phones.
 - The memory bound is an estimate from buffer sizes and covers the fallback's decode. It
-  does not cover Apple's decoder or rendering, which Core Image allocates. On a phone with
-  8 GB the default refuses one of the 822 test files the fallback develops, a 51 MP Phase
-  One file.
+  does not cover Apple's decoder or rendering, which Core Image allocates.
 - A truncated file in an uncompressed format is not detected and decodes with empty rows.
 - The color check needs an embedded preview. It reports a suspect result and still
   returns the image.
@@ -184,6 +182,10 @@ and WebAssembly builds, and regenerating the measurements.
   decode and develop but lack the looks, the color check and cancellation, and their CPU
   output is still clipped to sRGB. The WebAssembly build was tested under Node and not in a
   browser.
+
+## Note on using AI
+
+This repository was built with assistance from Claude Opus 5.5.
 
 ## License
 
