@@ -43,12 +43,14 @@ struct KernelTests {
             }
         }
 
+        /// - Parameter matrix: rows of the camera-to-sRGB matrix. The identity by default.
         func develop(
-            halfSize: Bool = false, whiteBalance: SIMD3<Float> = SIMD3(1, 1, 1)
+            halfSize: Bool = false, whiteBalance: SIMD3<Float> = SIMD3(1, 1, 1),
+            matrix: [SIMD3<Float>] = [SIMD3(1, 0, 0), SIMD3(0, 1, 0), SIMD3(0, 0, 1)]
         ) throws -> [[SIMD3<Float>]] {
             let parameters = MetalDevelop.Parameters(
                 black: blackLevels, whiteBalance: SIMD4(whiteBalance, 1),
-                matrixRow0: SIMD4(1, 0, 0, 0), matrixRow1: SIMD4(0, 1, 0, 0), matrixRow2: SIMD4(0, 0, 1, 0),
+                matrixRow0: SIMD4(matrix[0], 0), matrixRow1: SIMD4(matrix[1], 0), matrixRow2: SIMD4(matrix[2], 0),
                 pattern: pattern, origin: Self.origin, size: SIMD2(UInt32(width), UInt32(height)),
                 white: Self.white)
             let image = try samples.withUnsafeBytes { bytes in
@@ -56,7 +58,7 @@ struct KernelTests {
                     mosaic: bytes.baseAddress!, rowBytes: rawWidth * 2, rawWidth: rawWidth, rawHeight: rawHeight,
                     parameters: parameters, halfSize: halfSize).image
             }
-            return pixels(of: image)
+            return pixels(of: image, colorSpace: CGColorSpace.extendedLinearSRGB)
         }
     }
 
@@ -101,6 +103,21 @@ struct KernelTests {
             .develop()
         for pixel in developed.joined() {
             #expect(simd_distance(pixel, Self.flat) < Self.tolerance)
+        }
+    }
+
+    /// A camera sees colors more saturated than sRGB can hold. The matrix turns those into
+    /// components below zero, and the output has to keep them.
+    @Test(arguments: patterns)
+    func colorOutsideSRGBIsKept(_ pattern: SIMD4<UInt32>) throws {
+        // Rows sum to 1, so white stays white, as in a real camera matrix.
+        let matrix: [SIMD3<Float>] = [SIMD3(1.6, -0.4, -0.2), SIMD3(-0.3, 1.5, -0.2), SIMD3(-0.1, -0.5, 1.6)]
+        let red = SIMD3<Float>(0.8, 0.1, 0.05)
+        let expected = SIMD3(simd_dot(matrix[0], red), simd_dot(matrix[1], red), simd_dot(matrix[2], red))
+        try #require(expected.y < -0.05 && expected.z < -0.05)
+        let developed = try Mosaic(pattern: pattern) { _, _ in red }.develop(matrix: matrix)
+        for pixel in developed.joined() {
+            #expect(simd_distance(pixel, expected) < Self.tolerance)
         }
     }
 

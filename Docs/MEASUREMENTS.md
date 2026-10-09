@@ -226,6 +226,32 @@ Peak memory includes the benchmark's output buffer at 4 bytes per pixel.
 Every row includes the fallback's exposure measurement and color check. Across all files
 measured on the phone the embedded preview takes 22 to 74 ms.
 
+## Colors outside sRGB
+
+Share of pixels the fallback's CPU path would lose with sRGB primaries, and what it keeps
+with Rec. 2020, at half size:
+
+| File | A channel clipped to zero, sRGB primaries | The same, Rec. 2020 primaries | Below zero once converted to sRGB |
+|---|---|---|---|
+| Fujifilm X-E3 | 1.65% | 0.06% | 1.28% |
+| Fujifilm X-T50 | 0.54% | 0.10% | 0.34% |
+
+The GPU path writes floats and needs no wider primaries. A test feeds it a saturated red
+through a camera matrix and checks the negative components that come out.
+
+Apple's decoder and the fallback disagree on how many pixels lie outside sRGB. Scaled to
+512 pixels, 1.4% of the X-T50's pixels are outside sRGB in Apple's linear output and none
+are in the fallback's. I have not established why. Different color matrices are the likely
+cause.
+
+## Files in memory
+
+Of 179 corpus files that Apple's decoder opens from disk, up to twelve per file extension,
+175 also open from memory with no type given. The four that do not are Phase One files in
+a TIFF container, which the decoder reads a frame size for under none of its registered
+types. Finding the type takes 0.8 to 0.9 s for the first Samsung file on a Mac, which
+tries every type, and about 1 ms for the next.
+
 ## Binary size
 
 The demo's arm64 Release build, after dead-code stripping, from the linker's map:

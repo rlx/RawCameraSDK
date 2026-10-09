@@ -18,7 +18,7 @@ swift build
 As a dependency:
 
 ```swift
-.package(url: "https://github.com/rlx/RawCameraSDK.git", from: "0.1.0")
+.package(url: "https://github.com/rlx/RawCameraSDK.git", from: "0.2.0")
 // in the target:
 .product(name: "RawInputKit", package: "RawCameraSDK")
 ```
@@ -42,6 +42,7 @@ XcodeGen is only needed to change project settings (`project.yml`).
 ```sh
 Examples/RawInputDemo/Scripts/fetch-samples.sh        # the demo's eleven files, 285 MB
 Scripts/corpus.py fetch --only DMC-LX10_-_1_1         # one more, for the crop test, 22 MB
+Scripts/corpus.py fetch --only HASSELBLAD_-_Lunar     # optional: a rebadged camera, from memory
 swift test
 ```
 

@@ -93,8 +93,10 @@ the cache for a test of each file.
 `RawInput.open(data:typeHint:)` exists because PhotoKit delivers bytes. LibRaw reads them
 in place (`rik_open_buffer`), and `LibRawFile` keeps them alive. Apple's decoder needs the
 exact type for TIFF-based formats that ImageIO reports as plain TIFF. With no hint,
-`RawSource.memory` tries the camera maker's registered RAW types and keeps the first the
-decoder accepts.
+`RawSource.memory` tries the registered RAW types, the camera maker's first, and keeps the
+first one the decoder reads a frame size with. That needs no decoding. All types are
+tried and not only the maker's, because a rebadged camera such as the Hasselblad Lunar
+writes another maker's container. The answer is remembered per camera model.
 
 ### Async and cancellation
 
@@ -203,12 +205,12 @@ the demo app.
 
 | Suite | Needs | Covers |
 |---|---|---|
-| Metal kernel | a GPU | Demosaic, pattern indexing, origin, flips and clipping on synthetic mosaics, including the shared conformance cases |
+| Metal kernel | a GPU | Demosaic, pattern indexing, origin, flips, clipping and colors outside sRGB on synthetic mosaics, including the shared conformance cases |
 | Exposure estimate, Metadata | nothing | Pure functions, including non-finite input |
 | Looks | nothing | Curve properties, lookup-table layout, agreement with Core Image |
 | Preview agreement | nothing | Flags a color cast or a flipped picture, ignores brightness |
 | Robustness | nothing (truncation uses the samples) | Missing, empty, random and truncated files |
-| Bundled samples | `fetch-samples.sh`, 285 MB | Each sample fails on Apple and develops on the fallback, from disk and from memory; events, cancellation by callback and by task, memory limit, wide-gamut output |
+| Bundled samples | `fetch-samples.sh`, 285 MB | Each sample fails on Apple and develops on the fallback, from disk and from memory; events, cancellation by callback and by task, memory limit; the CPU path keeps colors that sRGB primaries clip |
 | Decoder agreement | the same, plus `corpus.py fetch --only DMC-LX10_-_1_1` | Size, color and crop agree between routes; pinned decoder version; Apple's decoder on bytes in memory; texture output with and without a copy |
 
 Outside `swift test`:

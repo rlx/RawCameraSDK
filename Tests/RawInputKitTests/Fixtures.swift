@@ -53,6 +53,9 @@ enum Fixtures {
     /// says the picture is square.
     static let cropped = corpusFile(named: "DMC-LX10_-_1_1") ?? document("cropped.rw2")
 
+    /// Hasselblad Lunar, a rebadged Sony: Hasselblad in the metadata, Sony's ARW container.
+    static let rebadged = corpusFile(named: "HASSELBLAD_-_Lunar")
+
     static let fetchHint: Comment = "run fetch-samples.sh, and Scripts/corpus.py fetch --only DMC-LX10_-_1_1"
 
     private static var corpus: URL { root.appending(path: "Tests/Corpus") }

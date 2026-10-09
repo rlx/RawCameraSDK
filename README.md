@@ -154,8 +154,10 @@ and WebAssembly builds, and regenerating the measurements.
   come close but do not match exactly.
 - The fallback clips highlights at sensor white. Apple's decoder keeps values above it.
 - Apple's decoder cannot identify Sony, Samsung, Pentax and some Nikon files from bytes in
-  memory. Without a type hint the library finds the type by trial, which costs 0.07 to
-  0.15 s per candidate type on a Mac. Pass the type PhotoKit reports to avoid it.
+  memory. Without a type hint the library finds the type by trial, which takes up to a
+  second for the first file of a camera model and a millisecond after that. Pass the type
+  PhotoKit reports to avoid it. Phase One files in a TIFF container open from disk on
+  Apple's decoder but not from memory under any type, so from memory they use the fallback.
 - A support answer is cached per camera and storage mode, so a damaged file from a
   supported camera reaches Apple's decoder untested and can render empty.
   `appleSupportCheck = .everyFile` tests each file, at 0.1 to 0.7 s apiece.

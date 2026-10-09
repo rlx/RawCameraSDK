@@ -118,6 +118,52 @@ struct SampleTests {
         #expect(throws: RawError.emptyData) { try RawInput.info(data: Data()) }
     }
 
+    /// With sRGB primaries LibRaw clips a color outside sRGB by setting a channel to zero.
+    /// With Rec. 2020 primaries those pixels keep a value that is negative in sRGB.
+    @Test func wideGamutOutputKeepsWhatSRGBClips() throws {
+        let sample = try #require(Fixtures.samples.first { $0.file.hasSuffix(".raf") })
+        /// Shares of pixels with a channel at zero, and with a channel below zero once
+        /// converted to sRGB.
+        func shares(wideGamut: Bool) throws -> (clipped: Double, negative: Double) {
+            let file = try LibRawFile(sample.url)
+            if wideGamut { file.useWideGamutOutput() }
+            try file.unpack()
+            return try file.withDeveloped(halfSize: true) { developed in
+                let pixels = try #require(developed.pixels)
+                let count = Int(developed.width) * Int(developed.height)
+                var clipped = 0, negative = 0
+                for pixel in 0..<count {
+                    let r = Double(pixels[pixel * 3]), g = Double(pixels[pixel * 3 + 1]), b = Double(pixels[pixel * 3 + 2])
+                    if min(r, g, b) == 0 { clipped += 1 }
+                    // Linear Rec. 2020 to linear sRGB (ITU-R BT.2087), below -0.1% of full scale.
+                    let srgb = [
+                        1.6605 * r - 0.5876 * g - 0.0728 * b, -0.1246 * r + 1.1329 * g - 0.0083 * b,
+                        -0.0182 * r - 0.1006 * g + 1.1187 * b,
+                    ]
+                    if wideGamut, srgb.min()! < -65.5 { negative += 1 }
+                }
+                return (Double(clipped) / Double(count), Double(negative) / Double(count))
+            }
+        }
+        let srgb = try shares(wideGamut: false), wide = try shares(wideGamut: true)
+        #expect(srgb.clipped > 0.01, "the sample has colors outside sRGB")
+        #expect(wide.clipped < srgb.clipped / 10)
+        #expect(wide.negative > srgb.clipped / 2, "most of what sRGB clipped is kept")
+    }
+
+    /// The same through the public API: the fallback's image has components below zero.
+    @Test func fallbackImageHasColorsOutsideSRGB() throws {
+        let sample = try #require(Fixtures.samples.first { $0.file.hasSuffix(".raf") })
+        let raw = try RawInput.open(sample.url)
+        #expect(raw.fallbackPath == .cpu)
+        // A full-resolution patch: scaling down would average the saturated pixels away.
+        let extent = raw.image.extent
+        let patch = raw.image.cropped(to: CGRect(x: extent.midX - 256, y: extent.midY - 256, width: 512, height: 512))
+            .transformed(by: CGAffineTransform(translationX: -(extent.midX - 256), y: -(extent.midY - 256)))
+        let all = pixels(of: patch, colorSpace: CGColorSpace.extendedLinearSRGB).joined()
+        #expect(all.contains { $0.min() < -0.001 })
+    }
+
     /// The CPU path converts to Rec. 2020 so that 16-bit integers can hold colors outside
     /// sRGB. Colors inside sRGB must come out the same either way.
     @Test func wideGamutOutputKeepsInGamutColor() throws {
@@ -352,6 +398,17 @@ struct AgreementTests {
         #expect(fromMemory.route == .apple)
         #expect(fromMemory.info == fromDisk.info && fromMemory.image.extent == fromDisk.image.extent)
         #expect(simd_distance(centerColor(fromMemory.image), centerColor(fromDisk.image)) < 0.001)
+    }
+
+    /// A rebadged camera writes another maker's container, so the maker's own types are
+    /// not enough to find the type of untyped bytes.
+    @Test(.enabled(if: Fixtures.rebadged != nil, "run Scripts/corpus.py fetch --only HASSELBLAD_-_Lunar"))
+    func untypedBytesFromARebadgedCameraReachApple() throws {
+        let file = try #require(Fixtures.rebadged)
+        try #require(RawInput.appleCanDecode(file))
+        let data = try Data(contentsOf: file)
+        #expect(RawInput.appleCanDecode(data: data))
+        #expect(try RawInput.open(data: data).route == .apple)
     }
 
     @Test func testingEveryFileStillPrefersApple() throws {

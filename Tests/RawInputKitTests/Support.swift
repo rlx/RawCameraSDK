@@ -14,13 +14,14 @@ func centerColor(_ image: CIImage) -> SIMD3<Float> {
     return SIMD3(pixel[0], pixel[1], pixel[2])
 }
 
-/// Every pixel of a small image as linear sRGB, first row at the top.
-func pixels(of image: CIImage) -> [[SIMD3<Float>]] {
+/// Every pixel of a small image as linear sRGB, first row at the top. Pass the extended
+/// space to read components outside 0...1 as they are.
+func pixels(of image: CIImage, colorSpace: CFString = CGColorSpace.linearSRGB) -> [[SIMD3<Float>]] {
     let width = Int(image.extent.width), height = Int(image.extent.height)
     var buffer = [Float](repeating: 0, count: width * height * 4)
     testContext.render(
         image, toBitmap: &buffer, rowBytes: width * 16, bounds: image.extent, format: .RGBAf,
-        colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB))
+        colorSpace: CGColorSpace(name: colorSpace))
     return (0..<height).map { y in
         (0..<width).map { x in
             let i = (y * width + x) * 4
