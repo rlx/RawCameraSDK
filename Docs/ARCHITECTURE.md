@@ -98,6 +98,18 @@ first one the decoder reads a frame size with. That needs no decoding. All types
 tried and not only the maker's, because a rebadged camera such as the Hasselblad Lunar
 writes another maker's container. The answer is remembered per camera model.
 
+### From the photo library
+
+The demo's Photos button is the whole integration (`PhotoImport.swift`): a `PhotosPicker`
+created with `preferredItemEncoding: .current`, so the file comes as stored and not as a
+converted JPEG. `RawInput.rawTypeIdentifier(among:)` picks the RAW type out of what the item
+offers, the item's data is requested as a RAW image, and both go to `open(data:typeHint:)`.
+The picker runs out of process, so the app needs no photo library permission.
+
+PhotoKit reports the exact type Apple's decoder needs for each of the sample formats, for
+example `com.sony.arw-raw-image` and `com.samsung.raw-image`. That is measured, in
+`PhotoLibraryTests.swift`, and is why passing the type through matters.
+
 ### Async and cancellation
 
 The blocking functions are the implementation. The `async` forms of `open` run them on a
@@ -140,8 +152,24 @@ what to do with it.
 
 `RawDecodeOptions.eventHandler` receives a `RawEvent` when Apple rejects a file, when the
 GPU path fails, when color is suspect, and when a file has been opened.
-`fallbackMemoryLimitMB` refuses a file whose header asks for too much memory. `isCancelled`
-is polled between decoding stages.
+`isCancelled` is polled between decoding stages.
+
+### Memory budget
+
+A decode holds whole frames, so an unbounded import ends with the system killing the app.
+`DecodeBudget` gives decoding a quarter of physical memory and derives two limits from it:
+
+- `DecodeGate` admits one async decode per 4 GB of memory, between 1 and 4. The rest
+  suspend in arrival order, holding no thread and no memory, and a task canceled while it
+  waits leaves the queue. `RawInput.maximumConcurrentDecodes` changes the number.
+- `fallbackMemoryLimitMB` defaults to the budget divided by that number. After unpacking,
+  `WorkingMemory` adds up what the chosen path will hold at its peak: the sensor data, and
+  either the mosaic texture and a float frame (GPU, about 12 bytes per pixel) or LibRaw's
+  working image, its result and the RGBA copy (CPU, about 24). A file over the limit throws
+  before it is developed. LibRaw's own cap on the sensor data uses the same number.
+
+The blocking functions bypass the gate, since their caller owns the threads. Apple's route
+allocates at render time, inside Core Image, and is outside both limits.
 
 ## Output contract
 
@@ -207,6 +235,9 @@ the demo app.
 |---|---|---|
 | Metal kernel | a GPU | Demosaic, pattern indexing, origin, flips, clipping and colors outside sRGB on synthetic mosaics, including the shared conformance cases |
 | Exposure estimate, Metadata | nothing | Pure functions, including non-finite input |
+| Photo library types | nothing | The RAW type is picked out of a RAW plus JPEG pair; every type PhotoKit reported is recognized |
+| Photo library | the simulator, through `photo-library-tests.sh` | Each sample saved to Photos and read back through PhotoKit: bytes identical, the reported type, the same decoder and picture as from disk, with and without the type. Photos refuses X3F |
+| Decode budget | nothing | The gate never exceeds its limit, drops a canceled waiter and admits more when the limit rises; the working-memory estimate |
 | Looks | nothing | Curve properties, lookup-table layout, agreement with Core Image |
 | Preview agreement | nothing | Flags a color cast or a flipped picture, ignores brightness |
 | Robustness | nothing (truncation uses the samples) | Missing, empty, random and truncated files |
@@ -216,7 +247,12 @@ the demo app.
 Outside `swift test`:
 
 - `Examples/RawInputDemo/UITests` drives the demo in the simulator.
-  `Scripts/record-demo.sh` records it for the README.
+  `Scripts/record-demo.sh` records the walkthrough for the README.
+- `Examples/RawInputDemo/Scripts/photo-library-tests.sh` runs the photo library tests in the
+  simulator, where the library is disposable and access can be granted without a prompt:
+  the PhotoKit suite above, then a UI test that picks every photo in the system picker and
+  checks that the RAW files open from their bytes and the others are refused with a reason.
+  It checks that the tests ran, since a missing permission makes them skip.
 - `rawprobe fuzz FILE...` decodes damaged copies of files in child processes, from disk
   and from memory, and keeps inputs that crash or hang in `fuzz-findings/`. CI runs 60
   cases under AddressSanitizer on every push, with a new seed each time.
@@ -266,7 +302,8 @@ rerun the probe and compare `Docs/coverage.md`. LibRaw must stay unmodified. See
 ## Demo app
 
 A gallery of embedded previews and a detail view with a decoder picker, a look picker and
-an exposure slider.
+an exposure slider. Files come from the bundle, from the Files picker, or from the photo
+library, and the last are opened from memory.
 
 - `Develop.swift` decodes with the library's async `open` and runs the other blocking
   calls on its own dispatch queue.
@@ -280,8 +317,6 @@ phase downloads the sample files.
 
 - Lens correction, noise reduction and highlight recovery on the fallback.
 - Highlight recovery. The fallback clips at sensor white.
-- A limit on concurrent decodes. Each holds a frame or two, so a caller opening many files
-  at once has to bound that itself.
 - Precompiled shaders. The kernel is compiled from source at first use, because
   `swift build` does not run the Metal compiler.
 - Tiled development. The GPU path develops a frame into one texture, so very large frames

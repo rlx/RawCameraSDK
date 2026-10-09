@@ -58,9 +58,21 @@ public struct RawDecodeOptions: Sendable {
     /// `RawImage.isHalfSize` for the outcome.
     public var halfSizeAbovePixels: Int = 64_000_000
 
-    /// Fallback route only: the most memory, in megabytes, the decoder may allocate for one
-    /// file. A file whose header asks for more throws `RawError.exceedsMemoryLimit`.
-    public var fallbackMemoryLimitMB = 1024
+    /// Fallback route only: the most working memory, in megabytes, one decode may use. A
+    /// file that needs more throws `RawError.exceedsMemoryLimit` before it is developed.
+    ///
+    /// The need is worked out from the frame size and the path that will develop it: the
+    /// sensor data plus every buffer alive at the peak, about 12 bytes per pixel on the
+    /// GPU path and 24 on the CPU path at full size. It covers the decode only. Rendering
+    /// the image afterwards is Core Image's memory, and so is all of Apple's route.
+    ///
+    /// The default shares a quarter of the device's physical memory between
+    /// `RawInput.maximumConcurrentDecodes` decodes: just under 1 GB each for two decodes on
+    /// a phone with 8 GB.
+    public var fallbackMemoryLimitMB = RawDecodeOptions.defaultFallbackMemoryLimitMB
+
+    /// The default for `fallbackMemoryLimitMB` on this device.
+    public static var defaultFallbackMemoryLimitMB: Int { DecodeBudget.megabytesPerDecode }
 
     /// Fallback route only: polled between decoding stages on the decoding thread. Return
     /// true to abandon the decode, which then throws `RawError.cancelled`. The `async`

@@ -38,6 +38,9 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
+        # Not needed by the app, whose photo picker runs out of process. The hosted tests
+        # in PhotoLibraryTests.swift write RAW files to the photo library and read them back.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: The test suite saves sample RAW files to the photo library and reads them back.
         # Lets Finder and `devicectl` put extra RAW files in the app's Documents folder.
         INFOPLIST_KEY_UIFileSharingEnabled: YES
         INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES

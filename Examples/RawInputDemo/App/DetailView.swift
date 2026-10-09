@@ -58,9 +58,9 @@ struct DetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .task { await model.loadPreview(item.url) }
+        .task { await model.loadPreview(item) }
         .task(id: DecodeKey(choice: choice, sceneLinear: rendering.look != nil)) {
-            await model.decode(item.url, routing: choice.routing, sceneLinear: rendering.look != nil)
+            await model.decode(item, routing: choice.routing, sceneLinear: rendering.look != nil)
         }
         .onChange(of: rendering, initial: true) { model.look = rendering.look }
     }

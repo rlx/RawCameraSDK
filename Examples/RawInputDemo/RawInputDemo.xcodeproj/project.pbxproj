@@ -7,9 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		12707CCC198D270C3FB6D3A3 /* GateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB0684C75E99C7DE1934674 /* GateTests.swift */; };
 		367AA12D81E7F24357CF0CFA /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 70AC221342EA6487B1B8AFB9 /* manifest.json */; };
+		3B19CDAE8F29E67F16F2977E /* PhotoLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5C0F9F5A942ECDF0E1E0336 /* PhotoLibraryTests.swift */; };
 		40911A24DE2EAEEB053ED534 /* DetailModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DBB02B212D106C94472D6D /* DetailModel.swift */; };
 		5A580E7201B5EEC225011234 /* Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A190F5AA084977D52BA41810 /* Support.swift */; };
+		7AC306136F97A540A0F190FF /* PhotoImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4FCC0D27E2D168FC8C87EC /* PhotoImport.swift */; };
 		8165D9936385E3226F21E3F8 /* WalkthroughTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96496F9A35806264BAC47A4D /* WalkthroughTests.swift */; };
 		91829409C0647150F437D8A6 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BAFB2AC0BE43AD6B919BAD6 /* DetailView.swift */; };
 		9886176CCE7711BD9B5EB7A3 /* kernel-cases.json in Resources */ = {isa = PBXBuildFile; fileRef = 075BB86BDF9276ED6A5A386F /* kernel-cases.json */; };
@@ -24,6 +27,7 @@
 		D9E524612D1A26B2AC6248B6 /* RawInputKit in Frameworks */ = {isa = PBXBuildFile; productRef = 677127829B7DBFC650E44503 /* RawInputKit */; };
 		DC03D4E045BC7054153BB317 /* Benchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FCD6F407EB09BF8092A662 /* Benchmark.swift */; };
 		E18AC672F33C44A729C2EF38 /* KernelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9973DCABE80E5FA02F1A8F3E /* KernelTests.swift */; };
+		E74FF9B98A5671B80BB2F9F6 /* PhotoImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ECABC1F05E241500A408C1 /* PhotoImportTests.swift */; };
 		F8F397B8E8017F803BA31BFA /* files in Resources */ = {isa = PBXBuildFile; fileRef = 1D955F60E9C3B59DDC506862 /* files */; };
 		FF37BB08D0CDEDC3AA23415C /* Develop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B95637202EE40E0F876EB48 /* Develop.swift */; };
 /* End PBXBuildFile section */
@@ -47,6 +51,7 @@
 
 /* Begin PBXFileReference section */
 		075BB86BDF9276ED6A5A386F /* kernel-cases.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "kernel-cases.json"; sourceTree = "<group>"; };
+		07ECABC1F05E241500A408C1 /* PhotoImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoImportTests.swift; sourceTree = "<group>"; };
 		07FCD6F407EB09BF8092A662 /* Benchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Benchmark.swift; sourceTree = "<group>"; };
 		0D42A21BE610B362FB7B8876 /* UnitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitTests.swift; sourceTree = "<group>"; };
 		1D955F60E9C3B59DDC506862 /* files */ = {isa = PBXFileReference; lastKnownFileType = folder; name = files; path = Samples/files; sourceTree = SOURCE_ROOT; };
@@ -59,14 +64,17 @@
 		761ACC6269F1A227FD177B47 /* RawInputDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RawInputDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		96496F9A35806264BAC47A4D /* WalkthroughTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkthroughTests.swift; sourceTree = "<group>"; };
 		9973DCABE80E5FA02F1A8F3E /* KernelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KernelTests.swift; sourceTree = "<group>"; };
+		9F4FCC0D27E2D168FC8C87EC /* PhotoImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoImport.swift; sourceTree = "<group>"; };
 		A190F5AA084977D52BA41810 /* Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support.swift; sourceTree = "<group>"; };
 		A81AEFF410CC849031321FA0 /* DecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecodeTests.swift; sourceTree = "<group>"; };
 		AE559389E18E21056D588863 /* GalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryView.swift; sourceTree = "<group>"; };
 		B1DBB02B212D106C94472D6D /* DetailModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailModel.swift; sourceTree = "<group>"; };
 		B4452341A7B442F28FCF987B /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
+		B5C0F9F5A942ECDF0E1E0336 /* PhotoLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryTests.swift; sourceTree = "<group>"; };
 		CF7E901BECA9E3F6E091F5F0 /* Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fixtures.swift; sourceTree = "<group>"; };
 		D4B74186889C14307364DA58 /* RawInputDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawInputDemoApp.swift; sourceTree = "<group>"; };
 		DA8BF2BF3030E642A6D55168 /* RawInputDemoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawInputDemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FFB0684C75E99C7DE1934674 /* GateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +109,7 @@
 		565242E7AFD8B69F6FF2D694 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				07ECABC1F05E241500A408C1 /* PhotoImportTests.swift */,
 				96496F9A35806264BAC47A4D /* WalkthroughTests.swift */,
 			);
 			path = UITests;
@@ -133,8 +142,10 @@
 			children = (
 				A81AEFF410CC849031321FA0 /* DecodeTests.swift */,
 				CF7E901BECA9E3F6E091F5F0 /* Fixtures.swift */,
+				FFB0684C75E99C7DE1934674 /* GateTests.swift */,
 				9973DCABE80E5FA02F1A8F3E /* KernelTests.swift */,
 				348380FCE54246337B1FFF10 /* LookTests.swift */,
+				B5C0F9F5A942ECDF0E1E0336 /* PhotoLibraryTests.swift */,
 				A190F5AA084977D52BA41810 /* Support.swift */,
 				0D42A21BE610B362FB7B8876 /* UnitTests.swift */,
 			);
@@ -151,6 +162,7 @@
 				4B95637202EE40E0F876EB48 /* Develop.swift */,
 				AE559389E18E21056D588863 /* GalleryView.swift */,
 				B4452341A7B442F28FCF987B /* Library.swift */,
+				9F4FCC0D27E2D168FC8C87EC /* PhotoImport.swift */,
 				D4B74186889C14307364DA58 /* RawInputDemoApp.swift */,
 			);
 			path = App;
@@ -335,6 +347,7 @@
 				FF37BB08D0CDEDC3AA23415C /* Develop.swift in Sources */,
 				A1637B190D278BFC7EB63C4C /* GalleryView.swift in Sources */,
 				C57C14E30D52FED5A53BC5FE /* Library.swift in Sources */,
+				7AC306136F97A540A0F190FF /* PhotoImport.swift in Sources */,
 				D3B4711775B43D7BD213FD3A /* RawInputDemoApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -343,6 +356,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E74FF9B98A5671B80BB2F9F6 /* PhotoImportTests.swift in Sources */,
 				8165D9936385E3226F21E3F8 /* WalkthroughTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -353,8 +367,10 @@
 			files = (
 				D65B2AEE7D3CD2172CDDEBD3 /* DecodeTests.swift in Sources */,
 				BDD65C23F312F6FB5F63327F /* Fixtures.swift in Sources */,
+				12707CCC198D270C3FB6D3A3 /* GateTests.swift in Sources */,
 				E18AC672F33C44A729C2EF38 /* KernelTests.swift in Sources */,
 				D7CCA3CBD19AED3D8EC7CD08 /* LookTests.swift in Sources */,
+				3B19CDAE8F29E67F16F2977E /* PhotoLibraryTests.swift in Sources */,
 				5A580E7201B5EEC225011234 /* Support.swift in Sources */,
 				9ED9E0B29DD96A018B45E579 /* UnitTests.swift in Sources */,
 			);
@@ -477,6 +493,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "RAW Input";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "The test suite saves sample RAW files to the photo library and reads them back.";
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -536,6 +553,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "RAW Input";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "The test suite saves sample RAW files to the photo library and reads them back.";
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

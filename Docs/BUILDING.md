@@ -18,7 +18,7 @@ swift build
 As a dependency:
 
 ```swift
-.package(url: "https://github.com/rlx/RawCameraSDK.git", from: "0.2.0")
+.package(url: "https://github.com/rlx/RawCameraSDK.git", from: "0.3.0")
 // in the target:
 .product(name: "RawInputKit", package: "RawCameraSDK")
 ```
@@ -30,7 +30,8 @@ iPhone simulator or "My Mac". The first build downloads eleven sample files (285
 
 The gallery has one file that both decoders open and ten that Apple's decoder rejects. In
 the detail view, the first picker selects the decoder and the second the rendering:
-the decoder's own output, or the Neutral or Film look. Import adds your own files.
+the decoder's own output, or the Neutral or Film look. Import adds your own files, and
+Photos adds RAW pictures from the photo library.
 
 To run on a phone, choose your team under Signing & Capabilities for the `RawInputDemo`
 target. The phone needs Developer Mode on (Settings → Privacy & Security).
@@ -47,6 +48,13 @@ swift test
 ```
 
 Suites whose files are missing are skipped.
+
+The photo library tests need a photo library they may write to, so they run in the
+simulator:
+
+```sh
+Examples/RawInputDemo/Scripts/photo-library-tests.sh    # PhotoKit round trip, then the picker
+```
 
 On the iPhone simulator:
 

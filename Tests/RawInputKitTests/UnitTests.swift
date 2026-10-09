@@ -170,3 +170,30 @@ struct RobustnessTests {
         }
     }
 }
+
+/// Choosing the RAW file among the types a photo-library item offers.
+@Suite("Photo library types")
+struct PhotoLibraryTypeTests {
+    /// A RAW plus JPEG pair lists the JPEG first.
+    @Test func picksTheRawOfARawPlusJPEGPair() {
+        #expect(RawInput.rawTypeIdentifier(among: ["public.jpeg", "com.sony.arw-raw-image"]) == "com.sony.arw-raw-image")
+        #expect(RawInput.rawTypeIdentifier(among: ["public.heic", "com.adobe.raw-image"]) == "com.adobe.raw-image")
+    }
+
+    /// Every type PhotoKit reported for the sample files, as recorded by the simulator tests.
+    @Test(arguments: [
+        "com.sony.arw-raw-image", "com.samsung.raw-image", "com.fuji.raw-image", "com.olympus.raw-image",
+        "com.panasonic.rw2-raw-image", "com.pentax.raw-image", "com.phaseone.raw-image", "com.canon.cr2-raw-image",
+        "com.adobe.raw-image",
+    ])
+    func recognizesTheTypesPhotoKitReports(_ type: String) {
+        #expect(RawInput.rawTypeIdentifier(among: [type]) == type)
+    }
+
+    @Test func aPhotoWithoutRawHasNone() {
+        #expect(RawInput.rawTypeIdentifier(among: ["public.jpeg", "public.heic", "public.png"]) == nil)
+        #expect(RawInput.rawTypeIdentifier(among: []) == nil)
+        #expect(RawInput.rawTypeIdentifier(among: ["not a type", "public.tiff"]) == nil)
+    }
+}
+

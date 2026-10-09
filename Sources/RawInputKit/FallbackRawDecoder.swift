@@ -58,8 +58,20 @@ enum FallbackRawDecoder {
 
         var info = RawInfo(raw)
         let wantsHalf = info.width * info.height > options.halfSizeAbovePixels
+        let isMosaic = raw.cfa_kind == RIK_CFA_BAYER.rawValue || raw.cfa_kind == RIK_CFA_XTRANS.rawValue
+        func fits(_ path: RawFallbackPath) -> Bool {
+            let need = WorkingMemory(
+                rawWidth: Int(raw.raw_width), rawHeight: Int(raw.raw_height), width: info.width, height: info.height,
+                planes: isMosaic ? 1 : max(1, Int(raw.colors)), isMonochrome: raw.colors == 1,
+                // LibRaw halves mosaic sensors only. A four-color mosaic is counted at full
+                // size, which errs on the side of refusing.
+                halfSize: wantsHalf && isMosaic
+            ).megabytes(on: path)
+            // Compared as floating point: a limit of `Int.max` means none.
+            return need <= Double(options.fallbackMemoryLimitMB)
+        }
 
-        if let core = file.developParameters, let metal = MetalDevelop.shared {
+        if let core = file.developParameters, let metal = MetalDevelop.shared, fits(.gpu) {
             let parameters = MetalDevelop.Parameters(core)
             // Any GPU error (backgrounded app, GPU memory, texture size limit) falls through
             // to LibRaw's development.
@@ -82,17 +94,13 @@ enum FallbackRawDecoder {
             }
         }
 
+        guard fits(.cpu) else { throw RawError.exceedsMemoryLimit }
         return try file.withDeveloped(halfSize: wantsHalf) { developed in
             let width = Int(developed.width), height = Int(developed.height)
             let channels = Int(developed.channels)
             guard let source = developed.pixels, width > 0, height > 0 else {
                 throw RawError.renderFailed(reason: "the decoder returned an empty image")
             }
-            // Compared in megabytes: a limit of `Int.max` would overflow as bytes.
-            guard width * height * 8 / 1_048_576 <= options.fallbackMemoryLimitMB else {
-                throw RawError.exceedsMemoryLimit
-            }
-
             // Core Image has no 16-bit three-channel format.
             var rgba = Data(count: width * height * 8)
             rgba.withUnsafeMutableBytes { buffer in
@@ -121,5 +129,35 @@ enum FallbackRawDecoder {
                 image: image.oriented(info.orientation), decoder: "LibRaw \(version) CPU", info: info,
                 exposureEV: ExposureEstimate.measure(image), isHalfSize: isHalf, path: .cpu)
         }
+    }
+}
+
+/// What one fallback decode holds in memory at its peak, worked out from the frame.
+///
+/// An estimate from buffer sizes, not a measurement. It leaves out LibRaw's small tables
+/// and anything Core Image allocates when the image is rendered.
+struct WorkingMemory {
+    var rawWidth: Int, rawHeight: Int
+    /// The picture area at full size.
+    var width: Int, height: Int
+    /// 16-bit values per pixel in the sensor data: 1 for a mosaic, 3 or 4 for full color.
+    var planes: Int
+    var isMonochrome: Bool
+    var halfSize: Bool
+
+    func megabytes(on path: RawFallbackPath) -> Double {
+        let sensor = Double(rawWidth * rawHeight * 2 * planes)
+        let pixels = Double(width * height) / (halfSize ? 4 : 1)
+        let development: Double
+        switch path {
+        case .gpu:
+            // The mosaic copied into a texture, and a 16-bit float RGBA result.
+            development = Double(rawWidth * rawHeight * 2) + pixels * 8
+        case .cpu:
+            // LibRaw's four-channel working image, its three-channel (or one-channel)
+            // result, and the RGBA copy handed to Core Image. All three are alive at once.
+            development = pixels * 8 + pixels * (isMonochrome ? 2 : 6) + pixels * 8
+        }
+        return (sensor + development) / 1_048_576
     }
 }

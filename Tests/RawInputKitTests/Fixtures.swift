@@ -38,6 +38,9 @@ enum Fixtures {
     /// The bundled file both decoders open: Sony a9 III, Bayer.
     static let reference = bundled.first { $0.group == "shared" }?.url
 
+    /// All eleven bundled files.
+    static var everySample: [Sample] { bundled }
+
     private static let bundled: [Sample] = {
         let manifests = [
             root.appending(path: "Examples/RawInputDemo/Samples/manifest.json"),

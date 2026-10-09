@@ -68,7 +68,9 @@ for the fallback.
 
 Photos come from the library as bytes, not files. `RawInput.open(data:typeHint:)` takes
 them directly. Pass PhotoKit's type identifier: without it Apple's decoder renders Sony,
-Samsung and Pentax files empty, which I found only by testing it.
+Samsung and Pentax files empty, which I found only by testing it. *Measured* in the
+simulator: PhotoKit reports the exact type the decoder needs for all ten sample formats
+that Photos will store, and each opens on the same decoder as from disk.
 
 **5. Measure demand before building a fallback.** The files Apple rejects are mostly old
 or niche: Sigma Foveon, Samsung NX, two Phase One compression modes, a monochrome Pentax.
@@ -91,7 +93,7 @@ affected.
 | Cost | Size |
 |---|---|
 | Binary | 0.85 MB for LibRaw and 0.15 MB for the Swift library, *measured* in the demo's arm64 Release build after dead-code stripping |
-| Memory | Up to 1.3 GB peak for a 40 MP X-Trans file, *measured* on a phone with 8 GB. Untested on phones with 4 GB or less |
+| Memory | Up to 1.3 GB peak for a 40 MP X-Trans file, *measured* on a phone with 8 GB. The library bounds decoding to a quarter of the device's memory, by an estimate and for the fallback only. Untested on phones with 4 GB or less |
 | Security | A large C++ parser reading untrusted files in the app's process. The mutation fuzzing here found nothing in 1,200 cases, which is not evidence of safety. A product needs coverage-guided fuzzing, and ideally decoding in an extension process |
 | Upkeep | Each LibRaw release needs every camera re-verified, because LibRaw can decode a new camera with wrong colors. Someone has to own that and the supported-camera list |
 | Consistency | Two decoders mean two renderings of the same camera. A user who updates iOS can find a file moved from the fallback to Apple, with a different picture, unless edits store the route as well as the version |

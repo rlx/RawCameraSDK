@@ -18,7 +18,8 @@ xcrun simctl io "$simulator" recordVideo --codec h264 --force "$movie" &
 recorder=$!
 sleep 2
 xcodebuild test-without-building -project RawInputDemo.xcodeproj -scheme RawInputDemoUITests \
-    -destination "platform=iOS Simulator,name=$simulator" -derivedDataPath "$derived" -quiet || status=$?
+    -destination "platform=iOS Simulator,name=$simulator" -derivedDataPath "$derived" \
+    -only-testing:RawInputDemoUITests/WalkthroughTests -quiet || status=$?
 # SIGINT is how simctl is told to finish the file cleanly.
 kill -INT "$recorder"
 wait "$recorder" 2>/dev/null || true

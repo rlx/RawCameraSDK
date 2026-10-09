@@ -35,7 +35,8 @@ public enum RawInput {
         try open(.memory(data, typeHint: typeHint), options: options, checksAppleSupport: true)
     }
 
-    /// Decodes a RAW file on a background queue.
+    /// Decodes a RAW file on a background queue, once fewer than
+    /// `maximumConcurrentDecodes` other decodes are running.
     ///
     /// Canceling the task stops a fallback decode at its next stage. On the Apple route
     /// the pixels are decoded later, when the image is rendered, so there is little here to
@@ -70,7 +71,8 @@ public enum RawInput {
         var options = options
         let callersCheck = options.isCancelled
         options.isCancelled = { cancelled.isSet || callersCheck?() == true }
-        return try await withTaskCancellationHandler {
+        // Waits here, holding no thread and no memory, while other decodes are running.
+        return try await DecodeGate.shared.run { [options] in try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 decodeQueue.async { [options] in
                     let result = Result { () throws -> RawImage in
@@ -85,7 +87,19 @@ public enum RawInput {
             }
         } onCancel: {
             cancelled.set()
-        }
+        } }
+    }
+
+    /// How many `async` decodes may run at once. Further calls wait their turn, in order,
+    /// without holding a thread, and leave the queue if their task is canceled.
+    ///
+    /// The default is one per 4 GB of physical memory, between 1 and 4, which with the
+    /// default `fallbackMemoryLimitMB` keeps the fallback's decoding within a quarter of
+    /// the device's memory. The blocking functions are not counted or held back: a caller
+    /// that runs them on its own threads bounds them itself.
+    public static var maximumConcurrentDecodes: Int {
+        get { DecodeGate.shared.maximum }
+        set { DecodeGate.shared.maximum = newValue }
     }
 
     private static func open(_ source: RawSource, options: RawDecodeOptions, checksAppleSupport: Bool) throws -> RawImage {

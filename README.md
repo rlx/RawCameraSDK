@@ -67,8 +67,9 @@ let picture = raw.rendered(look: .neutral)                     // same rendering
 let texture = try raw.makeTexture(device: device)              // for an engine that works in Metal
 let thumbnail = try RawInput.preview(url)                      // the camera's embedded JPEG
 
-// From PhotoKit, which delivers bytes and a type:
-let raw = try await RawInput.open(data: data, typeHint: resource.uniformTypeIdentifier)
+// From the photo library, which delivers bytes and a type. A RAW plus JPEG pair offers both:
+let type = RawInput.rawTypeIdentifier(among: item.supportedContentTypes.map(\.identifier))
+let raw = try await RawInput.open(data: data, typeHint: type)
 
 // Reopening an edit with the decoder version it was made on:
 edit.decoderVersion = raw.appleDecoderVersion                  // "8"
@@ -76,7 +77,10 @@ options.appleDecoderVersion = .pinned(edit.decoderVersion)
 ```
 
 `open` is also available as a blocking call. The `async` form decodes on a background
-queue and stops when its task is canceled.
+queue and stops when its task is canceled. At most a few async decodes run at once and
+the rest wait in line, so importing a folder cannot exhaust memory: decoding as a whole is
+kept to a quarter of the device's memory (`RawInput.maximumConcurrentDecodes`,
+`RawDecodeOptions.fallbackMemoryLimitMB`).
 
 ## Coverage
 
@@ -158,6 +162,9 @@ and WebAssembly builds, and regenerating the measurements.
   second for the first file of a camera model and a millisecond after that. Pass the type
   PhotoKit reports to avoid it. Phase One files in a TIFF container open from disk on
   Apple's decoder but not from memory under any type, so from memory they use the fallback.
+- Sigma X3F files cannot come from the photo library: Photos refuses to store them. The
+  other ten sample formats survive it byte for byte and open on the same decoder as from
+  disk, which a simulator test checks through PhotoKit and through the photo picker.
 - A support answer is cached per camera and storage mode, so a damaged file from a
   supported camera reaches Apple's decoder untested and can render empty.
   `appleSupportCheck = .everyFile` tests each file, at 0.1 to 0.7 s apiece.
@@ -165,6 +172,10 @@ and WebAssembly builds, and regenerating the measurements.
   bracketed series. A product would use a calibrated baseline per camera.
 - X-Trans and Foveon files run on a single CPU core and take seconds.
 - Above 64 MP the fallback develops mosaic sensors at half size to limit memory on phones.
+- The memory bound is an estimate from buffer sizes and covers the fallback's decode. It
+  does not cover Apple's decoder or rendering, which Core Image allocates. On a phone with
+  8 GB the default refuses one of the 822 test files the fallback develops, a 51 MP Phase
+  One file.
 - A truncated file in an uncompressed format is not detected and decodes with empty rows.
 - The color check needs an embedded preview. It reports a suspect result and still
   returns the image.

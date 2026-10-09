@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -5,6 +6,7 @@ import UniformTypeIdentifiers
 struct GalleryView: View {
     @Environment(Library.self) private var library
     @State private var isImporting = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
     @State private var path: [RawItem] = []
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 240), spacing: 12)]
@@ -28,7 +30,18 @@ struct GalleryView: View {
             .navigationTitle("RAW Input")
             .navigationDestination(for: RawItem.self) { DetailView(item: $0) }
             .toolbar {
+                // `.current` asks for the file as stored. The default may convert a RAW to
+                // JPEG. No `photoLibrary:` is given, so the picker runs out of process and
+                // the app needs no permission.
+                PhotosPicker(selection: $pickedPhotos, matching: .images, preferredItemEncoding: .current) {
+                    Label("Photos", systemImage: "photo.on.rectangle")
+                }
                 Button("Import", systemImage: "square.and.arrow.down") { isImporting = true }
+            }
+            .onChange(of: pickedPhotos) { _, picked in
+                guard !picked.isEmpty else { return }
+                pickedPhotos = []
+                Task { await library.add(picked) }
             }
             .onAppear {
                 // `-openSample 3` opens the third sample directly, for scripted screenshots (simctl cannot tap).
@@ -100,6 +113,6 @@ private struct Tile: View {
             Text(item.title).font(.subheadline.weight(.medium)).lineLimit(1)
             Text(item.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
-        .task(id: item.id) { thumbnail = await Develop.thumbnail(item.url) }
+        .task(id: item.id) { thumbnail = await Develop.thumbnail(item) }
     }
 }

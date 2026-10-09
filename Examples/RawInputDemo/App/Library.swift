@@ -1,10 +1,23 @@
 import Foundation
 import Observation
+import PhotosUI
+import RawInputKit
+import SwiftUI
 
 struct RawItem: Identifiable, Hashable {
+    /// How the file reached the app, which decides how it is opened.
+    enum Origin: Hashable {
+        /// A file on disk, opened by URL.
+        case file
+        /// Bytes from the photo library, with the type it reported. Opened from memory,
+        /// as an app would open them, although the demo keeps a copy on disk between views.
+        case photoLibrary(typeIdentifier: String)
+    }
+
     let url: URL
     let title: String
     let detail: String
+    var origin = Origin.file
 
     var id: URL { url }
 }
@@ -43,6 +56,26 @@ final class Library {
         }
         samples = items(shared: false)
         shared = items(shared: true)
+    }
+
+    /// Lists RAW files picked from the photo library.
+    ///
+    /// The bytes are parked in the temporary folder so a view can map them back into
+    /// memory. They are opened as `Data`, with the type the library reported.
+    func add(_ picked: [PhotosPickerItem]) async {
+        let root = FileManager.default.temporaryDirectory.appending(path: "Imported")
+        for (index, item) in picked.enumerated() {
+            do {
+                let raw = try await PickedRaw.load(item)
+                let info = try? RawInput.info(data: raw.data, typeHint: raw.typeIdentifier)
+                let copy = try await Develop.store(raw.data, in: root.appending(path: UUID().uuidString))
+                imported.append(RawItem(
+                    url: copy, title: info?.camera ?? "Photo \(index + 1)", detail: "Photos · \(raw.typeIdentifier)",
+                    origin: .photoLibrary(typeIdentifier: raw.typeIdentifier)))
+            } catch {
+                importFailure = error.localizedDescription
+            }
+        }
     }
 
     /// Copies picked files into the app's temporary folder and lists them.

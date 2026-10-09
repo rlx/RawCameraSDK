@@ -252,6 +252,29 @@ a TIFF container, which the decoder reads a frame size for under none of its reg
 types. Finding the type takes 0.8 to 0.9 s for the first Samsung file on a Mac, which
 tries every type, and about 1 ms for the next.
 
+## Through the photo library
+
+The eleven sample files saved to the iOS 27 simulator's photo library and read back with
+PhotoKit:
+
+| Format | Type PhotoKit reports | Bytes identical | Same decoder as from disk |
+|---|---|---|---|
+| Sony ARW | `com.sony.arw-raw-image` | yes | yes (Apple) |
+| Samsung SRW (2 files) | `com.samsung.raw-image` | yes | yes (fallback) |
+| Fujifilm RAF | `com.fuji.raw-image` | yes | yes (fallback) |
+| Olympus ORF | `com.olympus.raw-image` | yes | yes (fallback) |
+| Panasonic RW2 | `com.panasonic.rw2-raw-image` | yes | yes (fallback) |
+| Pentax PEF | `com.pentax.raw-image` | yes | yes (fallback) |
+| Phase One IIQ | `com.phaseone.raw-image` | yes | yes (fallback) |
+| Canon CR2 | `com.canon.cr2-raw-image` | yes | yes (fallback) |
+| DNG | `com.adobe.raw-image` | yes | yes (fallback) |
+| Sigma X3F | not stored: Photos refuses the file | | |
+
+Only one of the eleven is a file Apple's decoder opens, so this shows the type arriving
+intact for ten formats and Apple's decoder using it for one. The automated run is in the
+simulator. On an iPhone 16 Pro Max the picker import was checked by hand with a RAW
+capture from the phone's own camera.
+
 ## Binary size
 
 The demo's arm64 Release build, after dead-code stripping, from the linker's map:

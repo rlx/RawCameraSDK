@@ -42,19 +42,19 @@ final class DetailModel {
     private var shown: Request?
     private var wanted: Request { Request(generation: generation, exposure: exposure, look: look) }
 
-    func loadPreview(_ url: URL) async {
-        preview = await Develop.thumbnail(url)
+    func loadPreview(_ item: RawItem) async {
+        preview = await Develop.thumbnail(item)
     }
 
     /// - Parameter sceneLinear: see `Develop.open`. Changing it means decoding again.
-    func decode(_ url: URL, routing: RawDecodeOptions.Routing, sceneLinear: Bool) async {
+    func decode(_ item: RawItem, routing: RawDecodeOptions.Routing, sceneLinear: Bool) async {
         generation += 1
         let mine = generation
         raw = nil
         rendered = nil
         failure = nil
         do {
-            let decoded = try await Develop.open(url, routing: routing, sceneLinear: sceneLinear)
+            let decoded = try await Develop.open(item, routing: routing, sceneLinear: sceneLinear)
             guard mine == generation else { return }
             raw = decoded.image
             openSeconds = decoded.seconds

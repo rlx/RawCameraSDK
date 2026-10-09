@@ -264,6 +264,19 @@ struct SampleTests {
         #expect(throws: RawError.exceedsMemoryLimit) { try RawInput.open(sample.url, options: options) }
     }
 
+    /// The limit is compared with what the decode will hold at its peak, not only with the
+    /// sensor data: a 24 MP X-Trans file needs about 24 bytes per pixel on the CPU path.
+    @Test func memoryLimitCountsTheDevelopmentBuffers() throws {
+        let sample = try #require(Fixtures.samples.first { $0.file.hasSuffix(".raf") })
+        let megapixels = try RawInput.info(sample.url).megapixels
+        let need = megapixels * 24 * 1_000_000 / 1_048_576
+        var options = RawDecodeOptions()
+        options.fallbackMemoryLimitMB = Int(need * 0.9)
+        #expect(throws: RawError.exceedsMemoryLimit) { try RawInput.open(sample.url, options: options) }
+        options.fallbackMemoryLimitMB = Int(need * 1.1)
+        #expect(try RawInput.open(sample.url, options: options).fallbackPath == .cpu)
+    }
+
     /// `.max` means no limit on both paths, including in the arithmetic.
     @Test(arguments: Fixtures.samples)
     func anUnlimitedMemoryLimitIsAccepted(_ sample: Fixtures.Sample) throws {
